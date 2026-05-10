@@ -1,0 +1,40 @@
+{
+  "eslint.enable": true,
+  "eslint.useFlatConfig": true,
+  "eslint.format.enable": true,
+
+  // Tell ESLint to treat these folders as independent projects
+  "eslint.workingDirectories": [
+    { "directory": "server", "changeProcessCWD": true },
+    { "directory": "client", "changeProcessCWD": true }
+  ],
+
+  // Default Formatter Strategy
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+
+  // Language Specific Overrides
+  "[typescript]": {
+    "editor.defaultFormatter": "dbaeumer.vscode-eslint"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "dbaeumer.vscode-eslint"
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "dbaeumer.vscode-eslint"
+  },
+
+  // Keep your existing preferences
+  "editor.autoClosingBrackets": "always",
+  "files.autoSave": "onFocusChange",
+  "material-icon-theme.activeIconPack": "nest",
+  "debug.javascript.terminalOptions": {
+    "skipFiles": ["<node_internals>/**"]
+  },
+  "[dockerfile]": {
+    "editor.defaultFormatter": "ms-azuretools.vscode-containers"
+  }
+}
