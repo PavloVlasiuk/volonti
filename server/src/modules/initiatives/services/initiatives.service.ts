@@ -12,7 +12,6 @@ import { OrganizationsService } from '../../organizations/services/organizations
 import { VolunteerProfilesService } from '../../volunteer-profiles/services/volunteer-profiles.service';
 import { MailService } from '../../mail/services/mail.service';
 import { VolunteerInterest } from '../../volunteer-profiles/entities/volunteer-interest.entity';
-import { VolunteerProfile } from '../../volunteer-profiles/entities/volunteer-profile.entity';
 import { InitiativesRepository } from '../repositories/initiatives.repository';
 import { InitiativeDto } from '../dtos/initiative.dto';
 import { CreateInitiativeDto } from '../dtos/create-initiative.dto';
@@ -21,12 +20,13 @@ import { UpdateInitiativeStatusDto } from '../dtos/update-initiative-status.dto'
 import { Application } from '../../applications/entities/application.entity';
 import { ApplicationDto } from '../../applications/dtos/application.dto';
 import { FilterInitiativesDto } from '../dtos/filter-initiatives.dto';
+import { VolunteerProfileDto } from '../../volunteer-profiles/dtos/volunteer-profile.dto';
 
 function computeMatchScore(
   dto: InitiativeDto,
-  profile: VolunteerProfile,
+  profile: VolunteerProfileDto,
 ): number {
-  const categoryIds = profile.interests.map((i) => i.category.id);
+  const categoryIds = profile.interests.map((i) => i.id);
   const criteria = [
     categoryIds.includes(dto.categoryId) ? 2 : 0,
     profile.formatPreference === FormatPreference.ANY ||
@@ -58,7 +58,7 @@ export class InitiativesService {
     userId: string,
     dto: CreateInitiativeDto,
   ): Promise<InitiativeDto> {
-    const org = await this.organizationsService.findByUserId(userId);
+    const org = await this.organizationsService.findById(userId);
     const { categoryId, ...fields } = dto;
     const entity = this.initiativesRepository.create({
       ...fields,
@@ -77,10 +77,23 @@ export class InitiativesService {
     return this.initiativesRepository.findAllWithFilters(filters);
   }
 
+  async getMyInitiatives(userId: string): Promise<InitiativeDto[]> {
+    const org = await this.organizationsService.findById(userId);
+    if (!org) return [];
+    return this.initiativesRepository.findByOrganization(org.id);
+  }
+
   async findOne(id: string): Promise<InitiativeDto> {
     const dto = await this.initiativesRepository.findByIdWithRelations(id);
     if (!dto) throw new NotFoundException('Initiative not found');
     return dto;
+  }
+
+  async findById(id: string): Promise<InitiativeDto | null> {
+    return this.initiativesRepository.findOneToDto({
+      where: { id },
+      relations: ['organization'],
+    });
   }
 
   async update(
@@ -93,7 +106,7 @@ export class InitiativesService {
       relations: ['organization'],
     });
     if (!initiative) throw new NotFoundException('Initiative not found');
-    const org = await this.organizationsService.findByUserId(userId);
+    const org = await this.organizationsService.findById(userId);
     if (initiative.organization?.id !== org?.id)
       throw new ForbiddenException('Access denied');
 
@@ -113,8 +126,8 @@ export class InitiativesService {
     const existingDto =
       await this.initiativesRepository.findByIdWithRelations(id);
     if (!existingDto) throw new NotFoundException('Initiative not found');
-    const org = await this.organizationsService.findByUserId(userId);
-    if (existingDto.organizationId !== org?.id)
+    const org = await this.organizationsService.findById(userId);
+    if (existingDto.organization.id !== org?.id)
       throw new ForbiddenException('Access denied');
     await this.initiativesRepository.update(id, { status: dto.status });
     return await this.initiativesRepository.findByIdWithRelations(id);
@@ -124,8 +137,8 @@ export class InitiativesService {
     const existingDto =
       await this.initiativesRepository.findByIdWithRelations(id);
     if (!existingDto) throw new NotFoundException('Initiative not found');
-    const org = await this.organizationsService.findByUserId(userId);
-    if (existingDto.organizationId !== org?.id)
+    const org = await this.organizationsService.findById(userId);
+    if (existingDto.organization.id !== org?.id)
       throw new ForbiddenException('Access denied');
     await this.initiativesRepository.delete(id);
   }
@@ -137,8 +150,8 @@ export class InitiativesService {
     const existingDto =
       await this.initiativesRepository.findByIdWithRelations(initiativeId);
     if (!existingDto) throw new NotFoundException('Initiative not found');
-    const org = await this.organizationsService.findByUserId(userId);
-    if (existingDto.organizationId !== org?.id)
+    const org = await this.organizationsService.findById(userId);
+    if (existingDto.organization.id !== org?.id)
       throw new ForbiddenException('Access denied');
 
     const apps = await this.dataSource
@@ -155,7 +168,7 @@ export class InitiativesService {
   async getFeed(
     userId: string,
   ): Promise<Array<InitiativeDto & { matchScore: number }>> {
-    const profile = await this.volunteerProfilesService.findRawByUserId(userId);
+    const profile = await this.volunteerProfilesService.findByUserId(userId);
     if (!profile || !profile.interests?.length) {
       const all = await this.initiativesRepository.findAllWithFilters({});
       return all.map((dto) => ({ ...dto, matchScore: 0 }));
@@ -182,12 +195,10 @@ export class InitiativesService {
       .then((interests) =>
         Promise.all(
           interests.map((vi) =>
-            this.mailService
-              .sendNewInitiativeNotification(
-                vi.volunteerProfile.user.email,
-                initiative,
-              )
-              .catch(() => {}),
+            this.mailService.sendNewInitiativeNotification(
+              vi.volunteerProfile.user.email,
+              initiative,
+            ),
           ),
         ),
       )

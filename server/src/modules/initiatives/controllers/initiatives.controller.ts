@@ -10,14 +10,9 @@ import {
   Post,
   Put,
   Query,
-  UseGuards,
 } from '@nestjs/common';
-import { Roles } from '../../../common/decorators/roles.decorator';
-import { Public } from '../../../common/decorators/public.decorator';
+import { OrgVerifiedAuth } from '../../../common/decorators/organization-auth.decorator';
 import { GetUser } from '../../../common/decorators/get-user.decorator';
-import { RolesGuard } from '../../../common/guards/roles.guard';
-import { OrgVerifiedGuard } from '../../../common/guards/org-verified.guard';
-import { UserRole } from '../../../common/enums';
 import { InitiativesService } from '../services/initiatives.service';
 import { InitiativeDto } from '../dtos/initiative.dto';
 import { CreateInitiativeDto } from '../dtos/create-initiative.dto';
@@ -31,67 +26,66 @@ export class InitiativesController {
   constructor(private readonly initiativesService: InitiativesService) {}
 
   @Get()
-  @Public()
   findAll(@Query() filters: FilterInitiativesDto): Promise<InitiativeDto[]> {
     return this.initiativesService.findAll(filters);
   }
 
+  @Get('mine')
+  @OrgVerifiedAuth()
+  getMyInitiatives(@GetUser('id') orgId: string): Promise<InitiativeDto[]> {
+    return this.initiativesService.getMyInitiatives(orgId);
+  }
+
   @Get(':id')
-  @Public()
   findOne(@Param('id', ParseUUIDPipe) id: string): Promise<InitiativeDto> {
     return this.initiativesService.findOne(id);
   }
 
   @Post()
-  @Roles(UserRole.ORGANIZATION)
-  @UseGuards(RolesGuard, OrgVerifiedGuard)
+  @OrgVerifiedAuth()
   create(
-    @GetUser('id') userId: string,
+    @GetUser('id') orgId: string,
     @Body() dto: CreateInitiativeDto,
   ): Promise<InitiativeDto> {
-    return this.initiativesService.create(userId, dto);
+    return this.initiativesService.create(orgId, dto);
   }
 
   @Put(':id')
-  @Roles(UserRole.ORGANIZATION)
-  @UseGuards(RolesGuard)
+  @OrgVerifiedAuth()
   update(
     @Param('id', ParseUUIDPipe) id: string,
-    @GetUser('id') userId: string,
+    @GetUser('id') orgId: string,
     @Body() dto: UpdateInitiativeDto,
   ): Promise<InitiativeDto> {
-    return this.initiativesService.update(id, userId, dto);
+    return this.initiativesService.update(id, orgId, dto);
   }
 
   @Patch(':id/status')
-  @Roles(UserRole.ORGANIZATION)
-  @UseGuards(RolesGuard)
+  @OrgVerifiedAuth()
   updateStatus(
     @Param('id', ParseUUIDPipe) id: string,
-    @GetUser('id') userId: string,
+    @GetUser('id') orgId: string,
     @Body() dto: UpdateInitiativeStatusDto,
   ): Promise<InitiativeDto> {
-    return this.initiativesService.updateStatus(id, userId, dto);
+    return this.initiativesService.updateStatus(id, orgId, dto);
   }
 
   @Delete(':id')
-  @Roles(UserRole.ORGANIZATION)
-  @UseGuards(RolesGuard)
+  @OrgVerifiedAuth()
   @HttpCode(204)
   remove(
     @Param('id', ParseUUIDPipe) id: string,
-    @GetUser('id') userId: string,
+    @GetUser('id') orgId: string,
   ): Promise<void> {
-    return this.initiativesService.remove(id, userId);
+    return this.initiativesService.remove(id, orgId);
   }
 
   @Get(':id/applications')
-  @Roles(UserRole.ORGANIZATION)
-  @UseGuards(RolesGuard)
+  @OrgVerifiedAuth()
   getApplications(
     @Param('id', ParseUUIDPipe) id: string,
-    @GetUser('id') userId: string,
+    @GetUser('id') orgId: string,
   ): Promise<ApplicationDto[]> {
-    return this.initiativesService.getApplications(id, userId);
+    return this.initiativesService.getApplications(id, orgId);
   }
 }

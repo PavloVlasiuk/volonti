@@ -1,30 +1,43 @@
-import { Injectable } from '@nestjs/common';
-import { MailerService } from '@nestjs-modules/mailer';
+import { Injectable, Logger } from '@nestjs/common';
+import { ISendMailOptions, MailerService } from '@nestjs-modules/mailer';
 import { ApplicationStatus, OrgStatus } from '../../../common/enums';
 
 @Injectable()
 export class MailService {
+  private readonly logger = new Logger(MailService.name);
+
   constructor(private readonly mailerService: MailerService) {}
 
-  async sendApplicationStatusChanged(
+  async sendMail(options: ISendMailOptions): Promise<void> {
+    try {
+      await this.mailerService.sendMail(options);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send email (template: ${options.template ?? 'n/a'}): ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+    }
+  }
+
+  sendApplicationStatusChanged(
     to: string,
     volunteerName: string,
     initiativeTitle: string,
     status: ApplicationStatus,
   ): Promise<void> {
-    await this.mailerService.sendMail({
+    return this.sendMail({
       to,
-      subject: `Статус вашої заявки змінено`,
+      subject: 'Статус вашої заявки змінено',
       template: 'application-status',
       context: { volunteerName, initiativeTitle, status },
     });
   }
 
-  async sendNewInitiativeNotification(
+  sendNewInitiativeNotification(
     to: string,
     initiative: { title: string; city?: string | null; format: string },
   ): Promise<void> {
-    await this.mailerService.sendMail({
+    return this.sendMail({
       to,
       subject: `Нова ініціатива: ${initiative.title}`,
       template: 'new-initiative',
@@ -32,12 +45,12 @@ export class MailService {
     });
   }
 
-  async sendNewApplicationArrived(
+  sendNewApplicationArrived(
     to: string,
     volunteerName: string,
     initiativeTitle: string,
   ): Promise<void> {
-    await this.mailerService.sendMail({
+    return this.sendMail({
       to,
       subject: `Нова заявка на ініціативу "${initiativeTitle}"`,
       template: 'new-application',
@@ -45,13 +58,13 @@ export class MailService {
     });
   }
 
-  async sendVerificationResult(
+  sendVerificationResult(
     to: string,
     orgName: string,
     status: OrgStatus,
     reason?: string,
   ): Promise<void> {
-    await this.mailerService.sendMail({
+    return this.sendMail({
       to,
       subject:
         status === OrgStatus.VERIFIED
@@ -62,8 +75,8 @@ export class MailService {
     });
   }
 
-  async sendOtpCode(to: string, code: string): Promise<void> {
-    await this.mailerService.sendMail({
+  sendOtpCode(to: string, code: string): Promise<void> {
+    return this.sendMail({
       to,
       subject: 'Ваш код підтвердження',
       template: 'otp-code',

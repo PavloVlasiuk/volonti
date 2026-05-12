@@ -5,6 +5,12 @@ import { BaseRepositoryWrapper } from '../../../common/repositories/base.reposit
 import { Application } from '../entities/application.entity';
 import { ApplicationDto } from '../dtos/application.dto';
 
+const APPLICATION_RELATIONS = [
+  'initiative',
+  'initiative.organization',
+  'volunteerProfile',
+];
+
 @Injectable()
 export class ApplicationsRepository extends BaseRepositoryWrapper<
   Application,
@@ -16,27 +22,28 @@ export class ApplicationsRepository extends BaseRepositoryWrapper<
     super(Application, dataSource.createEntityManager());
   }
 
-  async findByIdWithRelations(id: string): Promise<Application | null> {
-    return this.findOne({
+  findById(id: string): Promise<ApplicationDto | null> {
+    return this.findOneToDto({
       where: { id },
-      relations: [
-        'initiative',
-        'initiative.organization',
-        'initiative.organization.user',
-        'volunteerProfile',
-        'volunteerProfile.user',
-      ],
+      relations: APPLICATION_RELATIONS,
     });
   }
 
-  async findByVolunteerProfile(
+  findByVolunteerProfile(
     volunteerProfileId: string,
   ): Promise<ApplicationDto[]> {
-    const entities = await this.find({
+    return this.findToDto({
       where: { volunteerProfile: { id: volunteerProfileId } },
-      relations: ['initiative', 'initiative.organization', 'volunteerProfile'],
+      relations: APPLICATION_RELATIONS,
       order: { createdAt: 'DESC' },
     });
-    return entities.map((e) => new ApplicationDto(e));
+  }
+
+  findByInitiative(initiativeId: string): Promise<ApplicationDto[]> {
+    return this.findToDto({
+      where: { initiative: { id: initiativeId } },
+      relations: APPLICATION_RELATIONS,
+      order: { createdAt: 'DESC' },
+    });
   }
 }

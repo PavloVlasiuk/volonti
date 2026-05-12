@@ -1,12 +1,4 @@
-import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  ManyToOne,
-  OneToMany,
-  PrimaryGeneratedColumn,
-  UpdateDateColumn,
-} from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import {
   FormatType,
   InitiativeStatus,
@@ -14,58 +6,60 @@ import {
 } from '../../../common/enums';
 import { Organization } from '../../organizations/entities/organization.entity';
 import { Category } from '../../categories/entities/category.entity';
+import { BaseEntity } from '../../../common/entities/base.entity';
+import { Application } from '../../applications/entities/application.entity';
 
 @Entity('initiatives')
-export class Initiative {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
-  @Column({ length: 255 })
+export class Initiative extends BaseEntity {
+  @Column({ name: 'title', length: 255 })
   title: string;
 
-  @Column('text')
+  @Column({ name: 'description', type: 'text' })
   description: string;
 
-  @Column({ type: 'enum', enum: InitiativeType })
+  @Column({ name: 'type', type: 'enum', enum: InitiativeType })
   type: InitiativeType;
 
-  @Column({ type: 'enum', enum: FormatType })
+  @Column({ name: 'format', type: 'enum', enum: FormatType })
   format: FormatType;
 
-  @Column({ length: 100, nullable: true })
+  @Column({ name: 'city', length: 100, nullable: true })
   city: string | null;
 
-  @Column({ type: 'smallint', nullable: true })
+  @Column({ name: 'min_age', type: 'smallint', nullable: true })
   minAge: number | null;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ name: 'requirements', type: 'text', nullable: true })
   requirements: string | null;
 
-  @Column({ type: 'date', nullable: true })
+  @Column({ name: 'starts_at', type: 'date', nullable: true })
   startsAt: Date | null;
 
-  @Column({ type: 'date', nullable: true })
+  @Column({ name: 'ends_at', type: 'date', nullable: true })
   endsAt: Date | null;
 
   @Column({
+    name: 'status',
     type: 'enum',
     enum: InitiativeStatus,
     default: InitiativeStatus.ACTIVE,
   })
   status: InitiativeStatus;
 
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
+  @Column({ name: 'organization_id' })
+  organizationId: string;
 
   @ManyToOne(() => Organization, (o) => o.initiatives, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'organization_id' })
   organization: Organization;
 
+  @Column({ name: 'category_id' })
+  categoryId: string;
+
   @ManyToOne(() => Category)
+  @JoinColumn({ name: 'category_id' })
   category: Category;
 
-  @OneToMany('Application', 'initiative')
-  applications: any[];
+  @OneToMany(() => Application, (application) => application.initiative)
+  applications: Application[];
 }

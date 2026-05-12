@@ -1,9 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { APP_GUARD } from '@nestjs/core';
 import { validateEnv, EnvironmentVariables } from './env.variables';
-import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { MailModule } from './modules/mail/mail.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { UsersModule } from './modules/users/users.module';
@@ -23,13 +21,12 @@ import { AdminModule } from './modules/admin/admin.module';
       inject: [ConfigService],
       useFactory: (config: ConfigService<EnvironmentVariables>) => ({
         type: 'postgres',
-        host: config.get('DB_HOST', { infer: true }),
-        port: config.get('DB_PORT', { infer: true }),
-        database: config.get('DB_NAME', { infer: true }),
-        username: config.get('DB_USER', { infer: true }),
-        password: config.get('DB_PASSWORD', { infer: true }),
+        host: config.get('DB_HOST'),
+        port: config.get('DB_PORT'),
+        database: config.get('DB_NAME'),
+        username: config.get('DB_USER'),
+        password: config.get('DB_PASSWORD'),
         entities: [__dirname + '/modules/**/*.entity{.ts,.js}'],
-        migrations: [__dirname + '/../db/migrations/*{.ts,.js}'],
         synchronize: false,
       }),
     }),
@@ -45,11 +42,6 @@ import { AdminModule } from './modules/admin/admin.module';
     ApplicationsModule,
     AdminModule,
   ],
-  providers: [
-    {
-      provide: APP_GUARD,
-      useClass: JwtAuthGuard,
-    },
-  ],
+  providers: [],
 })
 export class AppModule {}

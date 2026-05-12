@@ -1,39 +1,18 @@
-import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  OneToMany,
-  OneToOne,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
+import { Column, Entity } from 'typeorm';
 import { UserRole } from '../../../common/enums';
+import { BaseEntity } from '../../../common/entities/base.entity';
 
 @Entity('users')
-export class User {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
-  @Column({ unique: true })
+export class User extends BaseEntity {
+  @Column({ name: 'email', unique: true })
   email: string;
 
-  @Column()
+  @Column({ name: 'password_hash' })
   passwordHash: string;
 
-  @Column({ type: 'enum', enum: UserRole })
+  @Column({ name: 'role', type: 'enum', enum: UserRole })
   role: UserRole;
 
-  @Column({ default: false })
+  @Column({ name: 'two_fa_enabled', default: false })
   twoFaEnabled: boolean;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @OneToOne('VolunteerProfile', 'user')
-  volunteerProfile: any;
-
-  @OneToOne('Organization', 'user')
-  organization: any;
-
-  @OneToMany('OtpCode', 'user')
-  otpCodes: any[];
 }

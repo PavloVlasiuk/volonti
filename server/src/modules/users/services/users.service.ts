@@ -8,14 +8,18 @@ import { UsersRepository } from '../repositories/users.repository';
 export class UsersService {
   constructor(private readonly usersRepository: UsersRepository) {}
 
-  async findById(id: string): Promise<User> {
-    const user = await this.usersRepository.findOne({ where: { id } });
+  async findById(id: string): Promise<UserDto> {
+    const user = await this.usersRepository.findOneToDto({ where: { id } });
     if (!user) throw new NotFoundException('User not found');
     return user;
   }
 
-  async findByEmail(email: string): Promise<User | null> {
+  async findByEmail(email: string): Promise<UserDto | null> {
     return this.usersRepository.findByEmail(email);
+  }
+
+  findRawByEmail(email: string): Promise<User | null> {
+    return this.usersRepository.findRawByEmail(email);
   }
 
   async create(data: DeepPartial<User>): Promise<UserDto> {

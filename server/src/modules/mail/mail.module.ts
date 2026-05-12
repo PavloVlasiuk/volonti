@@ -1,6 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { MailerModule } from '@nestjs-modules/mailer';
-import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
+import { HandlebarsAdapter } from '@nestjs-modules/mailer/adapters/handlebars.adapter';
 import { ConfigService } from '@nestjs/config';
 import { join } from 'path';
 import { EnvironmentVariables } from '../../env.variables';
@@ -24,7 +24,7 @@ import { MailService } from './services/mail.service';
           from: config.get('MAIL_FROM', { infer: true }),
         },
         template: {
-          dir: join(__dirname, 'templates'),
+          dir: join(process.cwd(), 'mail', 'templates'),
           adapter: new HandlebarsAdapter(),
           options: { strict: true },
         },

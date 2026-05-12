@@ -7,10 +7,10 @@ import {
   FormatType,
   InitiativeStatus,
 } from '../../../common/enums';
-import { VolunteerProfile } from '../../volunteer-profiles/entities/volunteer-profile.entity';
 import { Initiative } from '../entities/initiative.entity';
 import { InitiativeDto } from '../dtos/initiative.dto';
 import { FilterInitiativesDto } from '../dtos/filter-initiatives.dto';
+import { VolunteerProfileDto } from '../../volunteer-profiles/dtos/volunteer-profile.dto';
 
 @Injectable()
 export class InitiativesRepository extends BaseRepositoryWrapper<
@@ -38,32 +38,34 @@ export class InitiativesRepository extends BaseRepositoryWrapper<
     if (filters.format)
       qb.andWhere('i.format = :format', { format: filters.format });
     if (filters.type) qb.andWhere('i.type = :type', { type: filters.type });
+    if (filters.organizationId)
+      qb.andWhere('org.id = :organizationId', {
+        organizationId: filters.organizationId,
+      });
 
     const entities = await qb.orderBy('i.createdAt', 'DESC').getMany();
     return entities.map((e) => new InitiativeDto(e));
   }
 
   async findByIdWithRelations(id: string): Promise<InitiativeDto | null> {
-    const entity = await this.findOne({
+    return this.findOneToDto({
       where: { id },
       relations: ['organization', 'category'],
     });
-    return entity ? new InitiativeDto(entity) : null;
   }
 
   async findByOrganization(organizationId: string): Promise<InitiativeDto[]> {
-    const entities = await this.find({
+    return this.findToDto({
       where: { organization: { id: organizationId } },
       relations: ['category', 'organization'],
       order: { createdAt: 'DESC' },
     });
-    return entities.map((e) => new InitiativeDto(e));
   }
 
   async findMatchingForVolunteer(
-    profile: VolunteerProfile,
+    profile: VolunteerProfileDto,
   ): Promise<InitiativeDto[]> {
-    const categoryIds = profile.interests.map((i: any) => i.category.id);
+    const categoryIds = profile.interests.map((i) => i.id);
     const qb = this.createQueryBuilder('i')
       .leftJoinAndSelect('i.organization', 'org')
       .leftJoinAndSelect('i.category', 'cat')

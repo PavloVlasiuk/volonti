@@ -17,19 +17,23 @@ export class OrganizationsRepository extends BaseRepositoryWrapper<
     super(Organization, dataSource.createEntityManager());
   }
 
-  async findByUserId(userId: string): Promise<Organization | null> {
-    return this.findOne({
-      where: { user: { id: userId } },
-      relations: ['user'],
-    });
+  async findByEmail(email: string): Promise<OrganizationDto | null> {
+    return this.findOneToDto({ where: { email } });
+  }
+
+  async findRawByEmail(email: string): Promise<Organization | null> {
+    return this.findOne({ where: { email } });
+  }
+
+  async findRawByEdrpou(edrpou: string): Promise<Organization | null> {
+    return this.findOne({ where: { edrpou } });
   }
 
   async findByStatus(status: OrgStatus): Promise<OrganizationDto[]> {
-    const entities = await this.find({
+    const entities = await this.findToDto({
       where: { status },
-      relations: ['user'],
       order: { createdAt: 'DESC' },
     });
-    return entities.map((e) => new OrganizationDto(e));
+    return entities;
   }
 }

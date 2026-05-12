@@ -7,7 +7,8 @@ import { OrganizationsModule } from '../organizations/organizations.module';
 import { UploadModule } from '../upload/upload.module';
 import { AuthService } from './services/auth.service';
 import { AuthController } from './controllers/auth.controller';
-import { JwtStrategy } from './strategies/jwt.strategy';
+import { JwtUserStrategy } from './strategies/jwt-user.strategy';
+import { JwtOrgStrategy } from './strategies/jwt-org.strategy';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 
 @Module({
@@ -19,7 +20,7 @@ import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
     OrganizationsModule,
     UploadModule,
   ],
-  providers: [AuthService, JwtStrategy, JwtRefreshStrategy],
+  providers: [AuthService, JwtUserStrategy, JwtOrgStrategy, JwtRefreshStrategy],
   controllers: [AuthController],
 })
 export class AuthModule {}

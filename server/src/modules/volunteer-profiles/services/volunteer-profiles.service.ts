@@ -6,7 +6,6 @@ import { VolunteerProfileDto } from '../dtos/volunteer-profile.dto';
 import { UpdateVolunteerProfileDto } from '../dtos/update-volunteer-profile.dto';
 import { VolunteerProfile } from '../entities/volunteer-profile.entity';
 import { VolunteerInterest } from '../entities/volunteer-interest.entity';
-import { Category } from '../../categories/entities/category.entity';
 
 @Injectable()
 export class VolunteerProfilesService {
@@ -15,15 +14,21 @@ export class VolunteerProfilesService {
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
-  async findByUserId(userId: string): Promise<VolunteerProfileDto> {
+  async findByUserId(userId: string): Promise<VolunteerProfileDto | null> {
+    return this.profilesRepository.findByUserIdWithInterests(userId);
+  }
+
+  findRawById(id: string): Promise<VolunteerProfile | null> {
+    return this.profilesRepository.findRawById(id);
+  }
+
+  async findByUserIdOrThrow(
+    userId: string,
+  ): Promise<VolunteerProfileDto | null> {
     const profile =
       await this.profilesRepository.findByUserIdWithInterests(userId);
     if (!profile) throw new NotFoundException('Volunteer profile not found');
-    return new VolunteerProfileDto(profile);
-  }
-
-  async findRawByUserId(userId: string): Promise<VolunteerProfile | null> {
-    return this.profilesRepository.findByUserIdWithInterests(userId);
+    return profile;
   }
 
   async update(
@@ -47,19 +52,17 @@ export class VolunteerProfilesService {
         });
 
         if (categoryIds.length > 0) {
-          const interests = categoryIds.map((catId) => {
-            const interest = new VolunteerInterest();
-            interest.volunteerProfile = profile;
-            interest.category = { id: catId } as Category;
-            return interest;
-          });
-          await manager.save(VolunteerInterest, interests);
+          await manager.save(
+            VolunteerInterest,
+            categoryIds.map((categoryId) => ({
+              volunteerProfileId: profile.id,
+              categoryId: categoryId,
+            })),
+          );
         }
       }
     });
 
-    const updated =
-      await this.profilesRepository.findByUserIdWithInterests(userId);
-    return new VolunteerProfileDto(updated);
+    return this.profilesRepository.findByUserIdWithInterests(userId);
   }
 }

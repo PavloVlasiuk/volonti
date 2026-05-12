@@ -13,7 +13,7 @@ export class OtpRepository extends BaseRepositoryWrapper<OtpCode, OtpCodeDto> {
     super(OtpCode, dataSource.createEntityManager());
   }
 
-  async findByPendingToken(pendingToken: string): Promise<OtpCode | null> {
-    return this.findOne({ where: { pendingToken }, relations: ['user'] });
+  async findByPendingToken(pendingToken: string): Promise<OtpCodeDto | null> {
+    return this.findOneToDto({ where: { pendingToken } });
   }
 }

@@ -13,7 +13,11 @@ export class UsersRepository extends BaseRepositoryWrapper<User, UserDto> {
     super(User, dataSource.createEntityManager());
   }
 
-  async findByEmail(email: string): Promise<User | null> {
+  async findByEmail(email: string): Promise<UserDto | null> {
+    return this.findOneToDto({ where: { email } });
+  }
+
+  async findRawByEmail(email: string): Promise<User | null> {
     return this.findOne({ where: { email } });
   }
 }

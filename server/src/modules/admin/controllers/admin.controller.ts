@@ -7,18 +7,15 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
-  UseGuards,
 } from '@nestjs/common';
-import { Roles } from '../../../common/decorators/roles.decorator';
-import { RolesGuard } from '../../../common/guards/roles.guard';
+import { RolesAuth } from '../../../common/decorators/roles-auth.decorator';
 import { OrgStatus, UserRole } from '../../../common/enums';
 import { OrganizationDto } from '../../organizations/dtos/organization.dto';
 import { AdminService } from '../services/admin.service';
 import { RejectOrganizationDto } from '../dtos/reject-organization.dto';
 
 @Controller('admin')
-@Roles(UserRole.ADMIN)
-@UseGuards(RolesGuard)
+@RolesAuth(UserRole.ADMIN)
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 

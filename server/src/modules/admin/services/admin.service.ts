@@ -25,29 +25,31 @@ export class AdminService {
     if (!org) throw new NotFoundException('Organization not found');
     await this.organizationsService.updateStatus(orgId, OrgStatus.VERIFIED);
     if (org.email) {
-      this.mailService
-        .sendVerificationResult(org.email, org.name, OrgStatus.VERIFIED)
-        .catch(() => {});
+      void this.mailService.sendVerificationResult(
+        org.email,
+        org.name,
+        OrgStatus.VERIFIED,
+      );
     }
   }
 
   async reject(orgId: string, dto: RejectOrganizationDto): Promise<void> {
     const org = await this.organizationsService.findById(orgId);
     if (!org) throw new NotFoundException('Organization not found');
+
     await this.organizationsService.updateStatus(
       orgId,
       OrgStatus.REJECTED,
       dto.reason,
     );
+
     if (org.email) {
-      this.mailService
-        .sendVerificationResult(
-          org.email,
-          org.name,
-          OrgStatus.REJECTED,
-          dto.reason,
-        )
-        .catch(() => {});
+      void this.mailService.sendVerificationResult(
+        org.email,
+        org.name,
+        OrgStatus.REJECTED,
+        dto.reason,
+      );
     }
   }
 }

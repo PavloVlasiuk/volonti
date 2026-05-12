@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -9,7 +10,7 @@ import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { EnvironmentVariables } from '../../../env.variables';
-import { OrgStatus, UserRole } from '../../../common/enums';
+import { ActorType, OrgStatus, UserRole } from '../../../common/enums';
 import { UsersService } from '../../users/services/users.service';
 import { OtpService } from '../../otp/services/otp.service';
 import { OrganizationsService } from '../../organizations/services/organizations.service';
@@ -19,12 +20,12 @@ import { RegisterVolunteerDto } from '../dtos/register-volunteer.dto';
 import { RegisterOrganizationDto } from '../dtos/register-organization.dto';
 import { LoginDto } from '../dtos/login.dto';
 import { VerifyOtpDto } from '../dtos/verify-otp.dto';
+import { RefreshJwtPayload } from '../strategies/jwt-refresh.strategy';
 import { User } from '../../users/entities/user.entity';
 
 @Injectable()
 export class AuthService {
   constructor(
-    @InjectDataSource() private readonly dataSource: DataSource,
     private readonly usersService: UsersService,
     private readonly otpService: OtpService,
     private readonly organizationsService: OrganizationsService,
@@ -32,6 +33,7 @@ export class AuthService {
     private readonly mailService: MailService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService<EnvironmentVariables>,
+    @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
   async registerVolunteer(dto: RegisterVolunteerDto): Promise<void> {
@@ -48,7 +50,7 @@ export class AuthService {
       const savedUser = await manager.save(user);
 
       await manager.query(
-        `INSERT INTO volunteer_profiles (first_name, last_name, user_id) VALUES ($1, $2, $3)`,
+        `INSERT INTO volunteer_profiles ("firstName", "lastName", "userId") VALUES ($1, $2, $3)`,
         [dto.firstName, dto.lastName, savedUser.id],
       );
     });
@@ -58,38 +60,29 @@ export class AuthService {
     dto: RegisterOrganizationDto,
     file: Express.Multer.File | undefined,
   ): Promise<void> {
-    const existing = await this.usersService.findByEmail(dto.email);
+    const existing = await this.organizationsService.findByEmail(dto.email);
     if (existing) throw new ConflictException('Email already registered');
 
     const documentUrl = file
       ? this.uploadService.getFileUrl(file.filename)
       : null;
 
-    await this.dataSource.transaction(async (manager) => {
-      const passwordHash = await bcrypt.hash(dto.password, 12);
-      const user = manager.create(User, {
-        email: dto.email,
-        passwordHash,
-        role: UserRole.ORGANIZATION,
-      });
-      const savedUser = await manager.save(user);
-
-      await manager.query(
-        `INSERT INTO organizations (name, type, edrpou, contact_person, document_url, user_id) VALUES ($1, $2, $3, $4, $5, $6)`,
-        [
-          dto.name,
-          dto.type,
-          dto.edrpou,
-          dto.contactPerson,
-          documentUrl,
-          savedUser.id,
-        ],
-      );
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+    await this.organizationsService.create({
+      name: dto.name,
+      type: dto.type,
+      edrpou: dto.edrpou,
+      contactPerson: dto.contactPerson,
+      email: dto.email,
+      passwordHash,
+      documentUrl,
     });
 
-    this.mailService
-      .sendVerificationResult(dto.email, dto.name, OrgStatus.PENDING)
-      .catch(() => {});
+    void this.mailService.sendVerificationResult(
+      dto.email,
+      dto.name,
+      OrgStatus.PENDING,
+    );
   }
 
   async login(
@@ -98,28 +91,64 @@ export class AuthService {
     | { status: 'otp_required'; pendingToken: string }
     | { accessToken: string; refreshToken: string }
   > {
-    const user = await this.usersService.findByEmail(dto.email);
+    const user = await this.usersService.findRawByEmail(dto.email);
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
     const passwordMatch = await bcrypt.compare(dto.password, user.passwordHash);
     if (!passwordMatch) throw new UnauthorizedException('Invalid credentials');
 
-    const needsOtp = user.role === UserRole.ORGANIZATION || user.twoFaEnabled;
-
-    if (needsOtp) {
-      const pendingToken = await this.otpService.generate(user.id);
+    if (user.twoFaEnabled) {
+      const pendingToken = await this.otpService.generate(
+        user.id,
+        user.email,
+        ActorType.USER,
+      );
       return { status: 'otp_required', pendingToken };
     }
 
-    return this.signTokens(user);
+    return this.signUserTokens(user.id, user.email, user.role);
+  }
+
+  async loginOrganization(dto: { edrpou: string; password: string }): Promise<{
+    status: 'otp_required';
+    pendingToken: string;
+  }> {
+    const org = await this.organizationsService.findRawByEdrpou(dto.edrpou);
+    if (!org) throw new UnauthorizedException('Invalid credentials');
+
+    const passwordMatch = await bcrypt.compare(dto.password, org.passwordHash);
+    if (!passwordMatch) throw new UnauthorizedException('Invalid credentials');
+
+    if (org.status === OrgStatus.PENDING) {
+      throw new ForbiddenException('Organization is pending verification');
+    }
+    if (org.status === OrgStatus.REJECTED) {
+      throw new ForbiddenException('Organization registration was rejected');
+    }
+
+    const pendingToken = await this.otpService.generate(
+      org.id,
+      org.email,
+      ActorType.ORGANIZATION,
+    );
+    return { status: 'otp_required', pendingToken };
   }
 
   async verifyOtp(
     dto: VerifyOtpDto,
   ): Promise<{ accessToken: string; refreshToken: string }> {
-    const userId = await this.otpService.verify(dto.pendingToken, dto.code);
-    const user = await this.usersService.findById(userId);
-    return this.signTokens(user);
+    const { actorId, actor } = await this.otpService.verify(
+      dto.pendingToken,
+      dto.code,
+    );
+
+    if (actor === ActorType.ORGANIZATION) {
+      const org = await this.organizationsService.findById(actorId);
+      return this.signOrgTokens(org.id, org.email);
+    }
+
+    const user = await this.usersService.findById(actorId);
+    return this.signUserTokens(user.id, user.email, user.role);
   }
 
   async enableTwoFa(userId: string): Promise<void> {
@@ -130,28 +159,51 @@ export class AuthService {
     await this.usersService.setTwoFa(userId, false);
   }
 
-  async refresh(payload: {
-    sub: string;
-    email: string;
-    role: string;
-  }): Promise<{ accessToken: string }> {
-    const accessToken = await this.jwtService.signAsync(
-      { sub: payload.sub, email: payload.email, role: payload.role },
-      {
-        secret: this.configService.get('JWT_ACCESS_SECRET', { infer: true }),
-        expiresIn: this.configService.get('JWT_ACCESS_EXPIRES_IN', {
-          infer: true,
-        }),
-      },
-    );
+  async refresh(payload: RefreshJwtPayload): Promise<{ accessToken: string }> {
+    const jwtPayload =
+      payload.actor === ActorType.ORGANIZATION
+        ? {
+            sub: payload.sub,
+            email: payload.email,
+            actor: ActorType.ORGANIZATION,
+          }
+        : {
+            sub: payload.sub,
+            email: payload.email,
+            role: payload.role,
+            actor: ActorType.USER,
+          };
+
+    const accessToken = await this.jwtService.signAsync(jwtPayload, {
+      secret: this.configService.get('JWT_ACCESS_SECRET', { infer: true }),
+      expiresIn: this.configService.get('JWT_ACCESS_EXPIRES_IN', {
+        infer: true,
+      }),
+    });
     return { accessToken };
   }
 
-  private signTokens(user: User): {
+  private signUserTokens(
+    id: string,
+    email: string,
+    role: UserRole,
+  ): { accessToken: string; refreshToken: string } {
+    const payload = { sub: id, email, role, actor: ActorType.USER };
+    return this.signTokenPair(payload);
+  }
+
+  private signOrgTokens(
+    id: string,
+    email: string,
+  ): { accessToken: string; refreshToken: string } {
+    const payload = { sub: id, email, actor: ActorType.ORGANIZATION };
+    return this.signTokenPair(payload);
+  }
+
+  private signTokenPair(payload: object): {
     accessToken: string;
     refreshToken: string;
   } {
-    const payload = { sub: user.id, email: user.email, role: user.role };
     const accessToken = this.jwtService.sign(payload, {
       secret: this.configService.get('JWT_ACCESS_SECRET', { infer: true }),
       expiresIn: this.configService.get('JWT_ACCESS_EXPIRES_IN', {

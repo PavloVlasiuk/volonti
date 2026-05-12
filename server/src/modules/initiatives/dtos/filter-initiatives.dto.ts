@@ -17,4 +17,8 @@ export class FilterInitiativesDto {
   @IsEnum(InitiativeType)
   @IsOptional()
   type?: InitiativeType;
+
+  @IsUUID()
+  @IsOptional()
+  organizationId?: string;
 }

@@ -6,21 +6,37 @@ export class ApplicationDto {
   status: ApplicationStatus;
   createdAt: Date;
   updatedAt: Date;
-  initiativeId: string;
-  initiativeTitle: string;
-  volunteerProfileId: string;
-  volunteerFirstName: string;
-  volunteerLastName: string;
+  initiative: {
+    id: string;
+    title: string;
+    organization: {
+      id: string;
+      name: string;
+    };
+  };
+  volunteer: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  };
 
   constructor(entity: Application) {
     this.id = entity.id;
     this.status = entity.status;
     this.createdAt = entity.createdAt;
     this.updatedAt = entity.updatedAt;
-    this.initiativeId = entity.initiative?.id;
-    this.initiativeTitle = entity.initiative?.title;
-    this.volunteerProfileId = entity.volunteerProfile?.id;
-    this.volunteerFirstName = entity.volunteerProfile?.firstName;
-    this.volunteerLastName = entity.volunteerProfile?.lastName;
+    this.initiative = {
+      id: entity.initiative?.id,
+      title: entity.initiative?.title,
+      organization: {
+        id: entity.initiative?.organization?.id,
+        name: entity.initiative?.organization?.name,
+      },
+    };
+    this.volunteer = {
+      id: entity.volunteerProfile?.id,
+      firstName: entity.volunteerProfile?.firstName,
+      lastName: entity.volunteerProfile?.lastName,
+    };
   }
 }

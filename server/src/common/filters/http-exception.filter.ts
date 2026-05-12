@@ -18,6 +18,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
+    console.error('Exception caught by filter:', exception);
+
     const message =
       exception instanceof HttpException
         ? (() => {

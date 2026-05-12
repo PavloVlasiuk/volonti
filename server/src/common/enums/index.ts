@@ -1,6 +1,5 @@
 export enum UserRole {
   VOLUNTEER = 'VOLUNTEER',
-  ORGANIZATION = 'ORGANIZATION',
   ADMIN = 'ADMIN',
 }
 
@@ -43,4 +42,9 @@ export enum ApplicationStatus {
   PENDING = 'PENDING',
   ACCEPTED = 'ACCEPTED',
   REJECTED = 'REJECTED',
+}
+
+export enum ActorType {
+  USER = 'USER',
+  ORGANIZATION = 'ORGANIZATION',
 }

@@ -2,6 +2,7 @@ import {
   FormatType,
   InitiativeStatus,
   InitiativeType,
+  OrgStatus,
 } from '../../../common/enums';
 import { Initiative } from '../entities/initiative.entity';
 
@@ -19,8 +20,12 @@ export class InitiativeDto {
   status: InitiativeStatus;
   createdAt: Date;
   updatedAt: Date;
-  organizationId: string;
-  organizationName: string;
+  organization: {
+    id: string;
+    name: string;
+    status: OrgStatus;
+    email: string;
+  };
   categoryId: string;
   categoryName: string;
 
@@ -38,8 +43,12 @@ export class InitiativeDto {
     this.status = entity.status;
     this.createdAt = entity.createdAt;
     this.updatedAt = entity.updatedAt;
-    this.organizationId = entity.organization?.id;
-    this.organizationName = entity.organization?.name;
+    this.organization = {
+      id: entity.organization?.id,
+      name: entity.organization?.name,
+      status: entity.organization?.status,
+      email: entity.organization?.email,
+    };
     this.categoryId = entity.category?.id;
     this.categoryName = entity.category?.name;
   }

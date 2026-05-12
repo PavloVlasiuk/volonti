@@ -18,10 +18,14 @@ export class VolunteerProfilesRepository extends BaseRepositoryWrapper<
 
   async findByUserIdWithInterests(
     userId: string,
-  ): Promise<VolunteerProfile | null> {
-    return this.findOne({
+  ): Promise<VolunteerProfileDto | null> {
+    return this.findOneToDto({
       where: { user: { id: userId } },
       relations: ['user', 'interests', 'interests.category'],
     });
+  }
+
+  async findRawById(id: string): Promise<VolunteerProfile | null> {
+    return this.findOne({ where: { id }, relations: ['user'] });
   }
 }

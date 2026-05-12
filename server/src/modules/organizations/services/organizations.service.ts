@@ -11,22 +11,28 @@ export class OrganizationsService {
     private readonly organizationsRepository: OrganizationsRepository,
   ) {}
 
-  async findByUserId(userId: string): Promise<OrganizationDto | null> {
-    const org = await this.organizationsRepository.findByUserId(userId);
-    return org ? new OrganizationDto(org) : null;
-  }
-
   async findById(id: string): Promise<OrganizationDto> {
-    const org = await this.organizationsRepository.findOne({
+    const org = await this.organizationsRepository.findOneToDto({
       where: { id },
-      relations: ['user'],
     });
     if (!org) throw new NotFoundException('Organization not found');
-    return new OrganizationDto(org);
+    return org;
   }
 
   async findByStatus(status: OrgStatus): Promise<OrganizationDto[]> {
     return this.organizationsRepository.findByStatus(status);
+  }
+
+  async findByEmail(email: string): Promise<OrganizationDto | null> {
+    return this.organizationsRepository.findByEmail(email);
+  }
+
+  findRawByEmail(email: string): Promise<Organization | null> {
+    return this.organizationsRepository.findRawByEmail(email);
+  }
+
+  findRawByEdrpou(edrpou: string): Promise<Organization | null> {
+    return this.organizationsRepository.findRawByEdrpou(edrpou);
   }
 
   async create(data: DeepPartial<Organization>): Promise<OrganizationDto> {

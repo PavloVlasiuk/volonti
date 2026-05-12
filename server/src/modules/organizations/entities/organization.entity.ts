@@ -1,51 +1,45 @@
-import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  JoinColumn,
-  OneToMany,
-  OneToOne,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
+import { Column, Entity, OneToMany } from 'typeorm';
 import { OrgStatus, OrgType } from '../../../common/enums';
-import { User } from '../../users/entities/user.entity';
+import { BaseEntity } from '../../../common/entities/base.entity';
+import { Initiative } from '../../initiatives/entities/initiative.entity';
 
 @Entity('organizations')
-export class Organization {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
-  @Column({ length: 255 })
+export class Organization extends BaseEntity {
+  @Column({ name: 'name', length: 255 })
   name: string;
 
-  @Column({ type: 'enum', enum: OrgType })
+  @Column({ name: 'type', type: 'enum', enum: OrgType })
   type: OrgType;
 
-  @Column({ unique: true, length: 8 })
+  @Column({ name: 'edrpou', unique: true, length: 8 })
   edrpou: string;
 
-  @Column({ length: 200 })
+  @Column({ name: 'contact_person', length: 200 })
   contactPerson: string;
 
-  @Column({ length: 500, nullable: true })
+  @Column({ name: 'document_url', length: 500, nullable: true })
   documentUrl: string | null;
 
-  @Column({ type: 'enum', enum: OrgStatus, default: OrgStatus.PENDING })
+  @Column({ name: 'email', unique: true, length: 255 })
+  email: string;
+
+  @Column({ name: 'password_hash' })
+  passwordHash: string;
+
+  @Column({
+    name: 'status',
+    type: 'enum',
+    enum: OrgStatus,
+    default: OrgStatus.PENDING,
+  })
   status: OrgStatus;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ name: 'rejection_reason', type: 'text', nullable: true })
   rejectionReason: string | null;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ name: 'verified_at', type: 'timestamptz', nullable: true })
   verifiedAt: Date | null;
 
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @OneToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn()
-  user: User;
-
-  @OneToMany('Initiative', 'organization')
-  initiatives: any[];
+  @OneToMany(() => Initiative, (initiative) => initiative.organization)
+  initiatives: Initiative[];
 }

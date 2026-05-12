@@ -8,12 +8,11 @@ export class OrganizationDto {
   edrpou: string;
   contactPerson: string;
   documentUrl: string | null;
+  email: string;
   status: OrgStatus;
   rejectionReason: string | null;
   verifiedAt: Date | null;
   createdAt: Date;
-  userId: string;
-  email: string | null;
 
   constructor(entity: Organization) {
     this.id = entity.id;
@@ -22,11 +21,10 @@ export class OrganizationDto {
     this.edrpou = entity.edrpou;
     this.contactPerson = entity.contactPerson;
     this.documentUrl = entity.documentUrl ?? null;
+    this.email = entity.email;
     this.status = entity.status;
     this.rejectionReason = entity.rejectionReason ?? null;
     this.verifiedAt = entity.verifiedAt ?? null;
     this.createdAt = entity.createdAt;
-    this.userId = entity.user?.id;
-    this.email = entity.user?.email ?? null;
   }
 }

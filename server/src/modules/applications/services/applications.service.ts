@@ -5,12 +5,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
 import { InitiativeStatus } from '../../../common/enums';
+import { Initiative } from '../../initiatives/entities/initiative.entity';
+import { VolunteerProfile } from '../../volunteer-profiles/entities/volunteer-profile.entity';
+import { InitiativesService } from '../../initiatives/services/initiatives.service';
+import { OrganizationsService } from '../../organizations/services/organizations.service';
 import { VolunteerProfilesService } from '../../volunteer-profiles/services/volunteer-profiles.service';
 import { MailService } from '../../mail/services/mail.service';
-import { Initiative } from '../../initiatives/entities/initiative.entity';
 import { ApplicationsRepository } from '../repositories/applications.repository';
 import { ApplicationDto } from '../dtos/application.dto';
 import { UpdateApplicationStatusDto } from '../dtos/update-application-status.dto';
@@ -20,18 +21,16 @@ export class ApplicationsService {
   constructor(
     private readonly applicationsRepository: ApplicationsRepository,
     private readonly volunteerProfilesService: VolunteerProfilesService,
+    private readonly initiativesService: InitiativesService,
+    private readonly organizationsService: OrganizationsService,
     private readonly mailService: MailService,
-    @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
   async submit(initiativeId: string, userId: string): Promise<ApplicationDto> {
-    const profile = await this.volunteerProfilesService.findRawByUserId(userId);
+    const profile = await this.volunteerProfilesService.findByUserId(userId);
     if (!profile) throw new NotFoundException('Volunteer profile not found');
 
-    const initiative = await this.dataSource.getRepository(Initiative).findOne({
-      where: { id: initiativeId },
-      relations: ['organization', 'organization.user'],
-    });
+    const initiative = await this.initiativesService.findById(initiativeId);
     if (!initiative) throw new NotFoundException('Initiative not found');
     if (initiative.status !== InitiativeStatus.ACTIVE) {
       throw new BadRequestException('Initiative is not active');
@@ -40,8 +39,8 @@ export class ApplicationsService {
     let savedId: string;
     try {
       const saved = await this.applicationsRepository.save({
-        initiative: { id: initiativeId } as any,
-        volunteerProfile: { id: profile.id } as any,
+        initiative: { id: initiativeId } as Initiative,
+        volunteerProfile: { id: profile.id } as VolunteerProfile,
       });
       savedId = saved.id;
     } catch (e: any) {
@@ -50,17 +49,13 @@ export class ApplicationsService {
       throw e;
     }
 
-    this.mailService
-      .sendNewApplicationArrived(
-        initiative.organization.user.email,
-        `${profile.firstName} ${profile.lastName}`,
-        initiative.title,
-      )
-      .catch(() => {});
+    void this.mailService.sendNewApplicationArrived(
+      initiative.organization.email,
+      `${profile.firstName} ${profile.lastName}`,
+      initiative.title,
+    );
 
-    const full =
-      await this.applicationsRepository.findByIdWithRelations(savedId);
-    return new ApplicationDto(full);
+    return this.applicationsRepository.findById(savedId);
   }
 
   async updateStatus(
@@ -68,11 +63,13 @@ export class ApplicationsService {
     userId: string,
     dto: UpdateApplicationStatusDto,
   ): Promise<ApplicationDto> {
-    const app =
-      await this.applicationsRepository.findByIdWithRelations(applicationId);
+    const app = await this.applicationsRepository.findById(applicationId);
     if (!app) throw new NotFoundException('Application not found');
 
-    if (app.initiative.organization.user.id !== userId) {
+    const org = await this.organizationsService
+      .findById(userId)
+      .catch(() => null);
+    if (!org || app.initiative.organization.id !== org.id) {
       throw new ForbiddenException('Access denied');
     }
 
@@ -80,22 +77,23 @@ export class ApplicationsService {
       status: dto.status,
     });
 
-    this.mailService
-      .sendApplicationStatusChanged(
-        app.volunteerProfile.user.email,
-        `${app.volunteerProfile.firstName} ${app.volunteerProfile.lastName}`,
+    const volunteerRaw = await this.volunteerProfilesService.findRawById(
+      app.volunteer.id,
+    );
+    if (volunteerRaw?.user?.email) {
+      void this.mailService.sendApplicationStatusChanged(
+        volunteerRaw.user.email,
+        `${volunteerRaw.firstName} ${volunteerRaw.lastName}`,
         app.initiative.title,
         dto.status,
-      )
-      .catch(() => {});
+      );
+    }
 
-    const updated =
-      await this.applicationsRepository.findByIdWithRelations(applicationId);
-    return new ApplicationDto(updated);
+    return this.applicationsRepository.findById(applicationId);
   }
 
   async findByVolunteer(userId: string): Promise<ApplicationDto[]> {
-    const profile = await this.volunteerProfilesService.findRawByUserId(userId);
+    const profile = await this.volunteerProfilesService.findByUserId(userId);
     if (!profile) throw new NotFoundException('Volunteer profile not found');
     return this.applicationsRepository.findByVolunteerProfile(profile.id);
   }
