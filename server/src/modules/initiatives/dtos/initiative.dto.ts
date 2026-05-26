@@ -18,6 +18,9 @@ export class InitiativeDto {
   startsAt: Date | null;
   endsAt: Date | null;
   status: InitiativeStatus;
+  slotsNeeded: number | null;
+  acceptedCount: number;
+  completedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
   organization: {
@@ -29,7 +32,7 @@ export class InitiativeDto {
   categoryId: string;
   categoryName: string;
 
-  constructor(entity: Initiative) {
+  constructor(entity: Initiative & { acceptedCount?: number }) {
     this.id = entity.id;
     this.title = entity.title;
     this.description = entity.description;
@@ -41,6 +44,9 @@ export class InitiativeDto {
     this.startsAt = entity.startsAt ?? null;
     this.endsAt = entity.endsAt ?? null;
     this.status = entity.status;
+    this.slotsNeeded = entity.slotsNeeded ?? null;
+    this.acceptedCount = Number(entity.acceptedCount ?? 0);
+    this.completedAt = entity.completedAt ?? null;
     this.createdAt = entity.createdAt;
     this.updatedAt = entity.updatedAt;
     this.organization = {

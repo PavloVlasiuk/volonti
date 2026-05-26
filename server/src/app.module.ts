@@ -13,6 +13,7 @@ import { VolunteerProfilesModule } from './modules/volunteer-profiles/volunteer-
 import { InitiativesModule } from './modules/initiatives/initiatives.module';
 import { ApplicationsModule } from './modules/applications/applications.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { CertificatesModule } from './modules/certificates/certificates.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { AdminModule } from './modules/admin/admin.module';
     InitiativesModule,
     ApplicationsModule,
     AdminModule,
+    CertificatesModule,
   ],
   providers: [],
 })

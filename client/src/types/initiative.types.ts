@@ -26,6 +26,7 @@ export type FormatPreference = (typeof FormatPreference)[keyof typeof FormatPref
 export const InitiativeStatus = {
   ACTIVE: 'ACTIVE',
   CLOSED: 'CLOSED',
+  COMPLETED: 'COMPLETED',
 } as const
 
 export type InitiativeStatus = (typeof InitiativeStatus)[keyof typeof InitiativeStatus]
@@ -42,6 +43,9 @@ export interface Initiative {
   startsAt: string | null
   endsAt: string | null
   minAge: number | null
+  slotsNeeded: number | null
+  acceptedCount: number
+  completedAt: string | null
   organization: {
     id: string
     name: string

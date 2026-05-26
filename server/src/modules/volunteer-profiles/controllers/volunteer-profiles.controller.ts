@@ -5,6 +5,7 @@ import { UserRole } from '../../../common/enums';
 import { VolunteerProfilesService } from '../services/volunteer-profiles.service';
 import { UpdateVolunteerProfileDto } from '../dtos/update-volunteer-profile.dto';
 import { VolunteerProfileDto } from '../dtos/volunteer-profile.dto';
+import { AchievementsDto } from '../dtos/achievements.dto';
 import { InitiativesService } from '../../initiatives/services/initiatives.service';
 
 @Controller('volunteer')
@@ -34,5 +35,10 @@ export class VolunteerProfilesController {
     @GetUser('id') userId: string,
   ): Promise<Array<{ matchScore: number } & Record<string, any>>> {
     return this.initiativesService.getFeed(userId);
+  }
+
+  @Get('achievements')
+  getAchievements(@GetUser('id') userId: string): Promise<AchievementsDto> {
+    return this.profilesService.getAchievements(userId);
   }
 }

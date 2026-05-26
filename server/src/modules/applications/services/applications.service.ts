@@ -5,7 +5,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InitiativeStatus } from '../../../common/enums';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
+import { ApplicationStatus, InitiativeStatus } from '../../../common/enums';
 import { Initiative } from '../../initiatives/entities/initiative.entity';
 import { VolunteerProfile } from '../../volunteer-profiles/entities/volunteer-profile.entity';
 import { InitiativesService } from '../../initiatives/services/initiatives.service';
@@ -13,7 +15,9 @@ import { OrganizationsService } from '../../organizations/services/organizations
 import { VolunteerProfilesService } from '../../volunteer-profiles/services/volunteer-profiles.service';
 import { MailService } from '../../mail/services/mail.service';
 import { ApplicationsRepository } from '../repositories/applications.repository';
+import { Application } from '../entities/application.entity';
 import { ApplicationDto } from '../dtos/application.dto';
+import { SubmitApplicationDto } from '../dtos/submit-application.dto';
 import { UpdateApplicationStatusDto } from '../dtos/update-application-status.dto';
 
 @Injectable()
@@ -24,9 +28,14 @@ export class ApplicationsService {
     private readonly initiativesService: InitiativesService,
     private readonly organizationsService: OrganizationsService,
     private readonly mailService: MailService,
+    @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
-  async submit(initiativeId: string, userId: string): Promise<ApplicationDto> {
+  async submit(
+    initiativeId: string,
+    userId: string,
+    dto: SubmitApplicationDto,
+  ): Promise<ApplicationDto> {
     const profile = await this.volunteerProfilesService.findByUserId(userId);
     if (!profile) throw new NotFoundException('Volunteer profile not found');
 
@@ -41,6 +50,12 @@ export class ApplicationsService {
       const saved = await this.applicationsRepository.save({
         initiative: { id: initiativeId } as Initiative,
         volunteerProfile: { id: profile.id } as VolunteerProfile,
+        motivation: dto.motivation,
+        availability: dto.availability,
+        contactPhone: dto.contactPhone ?? null,
+        experience: dto.experience ?? null,
+        hasTransport: dto.hasTransport,
+        canStartImmediately: dto.canStartImmediately,
       });
       savedId = saved.id;
     } catch (e: any) {
@@ -73,8 +88,32 @@ export class ApplicationsService {
       throw new ForbiddenException('Access denied');
     }
 
-    await this.applicationsRepository.update(applicationId, {
-      status: dto.status,
+    await this.dataSource.transaction(async (manager) => {
+      await manager.update(Application, applicationId, {
+        status: dto.status,
+      });
+
+      if (dto.status === ApplicationStatus.ACCEPTED) {
+        const initiativeRow = await manager
+          .getRepository(Initiative)
+          .findOne({ where: { id: app.initiative.id } });
+        if (
+          initiativeRow?.slotsNeeded != null &&
+          initiativeRow.status === InitiativeStatus.ACTIVE
+        ) {
+          const acceptedCount = await manager.getRepository(Application).count({
+            where: {
+              initiativeId: app.initiative.id,
+              status: ApplicationStatus.ACCEPTED,
+            },
+          });
+          if (acceptedCount >= initiativeRow.slotsNeeded) {
+            await manager.update(Initiative, app.initiative.id, {
+              status: InitiativeStatus.CLOSED,
+            });
+          }
+        }
+      }
     });
 
     const volunteerRaw = await this.volunteerProfilesService.findRawById(

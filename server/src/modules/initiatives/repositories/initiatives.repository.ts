@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { DataSource, SelectQueryBuilder } from 'typeorm';
 import { BaseRepositoryWrapper } from '../../../common/repositories/base.repository';
 import {
+  ApplicationStatus,
   FormatPreference,
   FormatType,
   InitiativeStatus,
@@ -23,13 +24,27 @@ export class InitiativesRepository extends BaseRepositoryWrapper<
     super(Initiative, dataSource.createEntityManager());
   }
 
+  private baseQuery(): SelectQueryBuilder<Initiative> {
+    return this.createQueryBuilder('i')
+      .leftJoinAndSelect('i.organization', 'org')
+      .leftJoinAndSelect('i.category', 'cat')
+      .loadRelationCountAndMap(
+        'i.acceptedCount',
+        'i.applications',
+        'app',
+        (q) =>
+          q.where('app.status = :acceptedStatus', {
+            acceptedStatus: ApplicationStatus.ACCEPTED,
+          }),
+      );
+  }
+
   async findAllWithFilters(
     filters: FilterInitiativesDto,
   ): Promise<InitiativeDto[]> {
-    const qb = this.createQueryBuilder('i')
-      .leftJoinAndSelect('i.organization', 'org')
-      .leftJoinAndSelect('i.category', 'cat')
-      .where('i.status = :status', { status: InitiativeStatus.ACTIVE });
+    const qb = this.baseQuery().where('i.status = :status', {
+      status: InitiativeStatus.ACTIVE,
+    });
 
     if (filters.category)
       qb.andWhere('cat.id = :category', { category: filters.category });
@@ -44,32 +59,37 @@ export class InitiativesRepository extends BaseRepositoryWrapper<
       });
 
     const entities = await qb.orderBy('i.createdAt', 'DESC').getMany();
-    return entities.map((e) => new InitiativeDto(e));
+    return entities.map(
+      (e) => new InitiativeDto(e as Initiative & { acceptedCount?: number }),
+    );
   }
 
   async findByIdWithRelations(id: string): Promise<InitiativeDto | null> {
-    return this.findOneToDto({
-      where: { id },
-      relations: ['organization', 'category'],
-    });
+    const entity = await this.baseQuery()
+      .where('i.id = :id', { id })
+      .getOne();
+    return entity
+      ? new InitiativeDto(entity as Initiative & { acceptedCount?: number })
+      : null;
   }
 
   async findByOrganization(organizationId: string): Promise<InitiativeDto[]> {
-    return this.findToDto({
-      where: { organization: { id: organizationId } },
-      relations: ['category', 'organization'],
-      order: { createdAt: 'DESC' },
-    });
+    const entities = await this.baseQuery()
+      .where('org.id = :organizationId', { organizationId })
+      .orderBy('i.createdAt', 'DESC')
+      .getMany();
+    return entities.map(
+      (e) => new InitiativeDto(e as Initiative & { acceptedCount?: number }),
+    );
   }
 
   async findMatchingForVolunteer(
     profile: VolunteerProfileDto,
   ): Promise<InitiativeDto[]> {
     const categoryIds = profile.interests.map((i) => i.id);
-    const qb = this.createQueryBuilder('i')
-      .leftJoinAndSelect('i.organization', 'org')
-      .leftJoinAndSelect('i.category', 'cat')
-      .where('i.status = :status', { status: InitiativeStatus.ACTIVE });
+    const qb = this.baseQuery().where('i.status = :status', {
+      status: InitiativeStatus.ACTIVE,
+    });
 
     if (categoryIds.length) {
       qb.andWhere('cat.id IN (:...categoryIds)', { categoryIds });
@@ -94,6 +114,8 @@ export class InitiativesRepository extends BaseRepositoryWrapper<
     }
 
     const entities = await qb.orderBy('i.createdAt', 'DESC').getMany();
-    return entities.map((e) => new InitiativeDto(e));
+    return entities.map(
+      (e) => new InitiativeDto(e as Initiative & { acceptedCount?: number }),
+    );
   }
 }

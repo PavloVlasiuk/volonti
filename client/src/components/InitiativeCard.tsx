@@ -59,7 +59,14 @@ export default function InitiativeCard({ initiative, matchScore, compact = false
         </p>
       </div>
 
-      <DateRow initiative={initiative} />
+      <div className="flex items-center justify-between gap-2">
+        <DateRow initiative={initiative} />
+        {initiative.slotsNeeded != null && (
+          <span className="text-xs font-medium text-accent">
+            {initiative.acceptedCount} / {initiative.slotsNeeded}
+          </span>
+        )}
+      </div>
 
       {matchScore !== undefined && <MatchScoreBar score={matchScore} />}
 

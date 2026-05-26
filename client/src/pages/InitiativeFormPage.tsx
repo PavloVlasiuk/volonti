@@ -23,6 +23,7 @@ const schema = z.object({
   startsAt: z.string().optional(),
   endsAt: z.string().optional(),
   minAge: z.coerce.number().int().min(0).max(100).optional().or(z.literal('')),
+  slotsNeeded: z.coerce.number().int().min(1).max(10000).optional().or(z.literal('')),
   description: z.string().min(10, 'Мінімум 10 символів'),
   requirements: z.string().optional(),
 })
@@ -104,6 +105,7 @@ export default function InitiativeFormPage() {
       setValue('startsAt', existing.startsAt ? existing.startsAt.slice(0, 10) : '')
       setValue('endsAt', existing.endsAt ? existing.endsAt.slice(0, 10) : '')
       setValue('minAge', existing.minAge ?? '')
+      setValue('slotsNeeded', existing.slotsNeeded ?? '')
       setValue('description', existing.description)
       setValue('requirements', existing.requirements ?? '')
     }
@@ -130,6 +132,7 @@ export default function InitiativeFormPage() {
     const payload = {
       ...data,
       minAge: data.minAge === '' ? undefined : Number(data.minAge),
+      slotsNeeded: data.slotsNeeded === '' ? undefined : Number(data.slotsNeeded),
       city: data.city || undefined,
       startsAt: data.startsAt || undefined,
       endsAt: data.endsAt || undefined,
@@ -248,16 +251,27 @@ export default function InitiativeFormPage() {
                 />
               </div>
 
-              {/* Min age */}
-              <Input
-                label="Мінімальний вік (необов'язково)"
-                type="number"
-                min={0}
-                max={100}
-                placeholder="18"
-                error={errors.minAge?.message}
-                {...register('minAge')}
-              />
+              {/* Min age + slots */}
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  label="Мінімальний вік (необов'язково)"
+                  type="number"
+                  min={0}
+                  max={100}
+                  placeholder="18"
+                  error={errors.minAge?.message}
+                  {...register('minAge')}
+                />
+                <Input
+                  label="Скільки волонтерів потрібно? (необов'язково)"
+                  type="number"
+                  min={1}
+                  max={10000}
+                  placeholder="10"
+                  error={errors.slotsNeeded?.message}
+                  {...register('slotsNeeded')}
+                />
+              </div>
 
               {/* Description */}
               <Textarea

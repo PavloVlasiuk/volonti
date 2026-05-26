@@ -1,5 +1,6 @@
 import client from './client'
 import type { FeedItem, FormatPreference } from '../types/initiative.types'
+import type { AchievementsSummary } from '../types/achievement.types'
 
 export interface VolunteerProfile {
   id: string
@@ -34,5 +35,10 @@ export async function updateProfile(data: UpdateProfileDto): Promise<VolunteerPr
 
 export async function getFeed(): Promise<FeedItem[]> {
   const res = await client.get('/volunteer/feed')
+  return res.data
+}
+
+export async function getAchievements(): Promise<AchievementsSummary> {
+  const res = await client.get('/volunteer/achievements')
   return res.data
 }

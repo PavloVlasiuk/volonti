@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import Badge from '../components/Badge'
 import Spinner from '../components/Spinner'
 import InitiativeCard from '../components/InitiativeCard'
 import MatchScoreBar from '../components/MatchScoreBar'
+import ApplicationFormModal from '../components/ApplicationFormModal'
 import { getInitiative, getInitiatives } from '../api/initiatives.api'
-import { submitApplication } from '../api/applications.api'
 import { useAuth } from '../context/AuthContext'
 import { formatDate } from '../utils/formatDate'
 import type { Initiative } from '../types/initiative.types'
@@ -32,6 +32,9 @@ function MetaRow({ initiative }: { initiative: Initiative }) {
     parts.push(`${formatDate(initiative.startsAt ?? undefined)} — ${formatDate(initiative.endsAt ?? undefined)}`)
   }
   if (initiative.minAge) parts.push(`Від ${initiative.minAge} років`)
+  if (initiative.slotsNeeded != null) {
+    parts.push(`${initiative.acceptedCount} / ${initiative.slotsNeeded} заявок прийнято`)
+  }
 
   return (
     <p className="text-sm text-muted leading-relaxed">
@@ -44,12 +47,10 @@ function ApplyButton({
   initiative,
   hasApplied,
   onApply,
-  isPending,
 }: {
   initiative: Initiative
   hasApplied: boolean
   onApply: () => void
-  isPending: boolean
 }) {
   const { isAuthenticated, isVolunteer } = useAuth()
   const navigate = useNavigate()
@@ -95,10 +96,9 @@ function ApplyButton({
   return (
     <button
       onClick={onApply}
-      disabled={isPending}
-      className="w-full rounded-xl bg-accent py-3 text-sm font-semibold text-bg hover:bg-accent/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+      className="w-full rounded-xl bg-accent py-3 text-sm font-semibold text-bg hover:bg-accent/90 transition-colors flex items-center justify-center gap-2"
     >
-      {isPending ? <Spinner /> : 'Подати заявку'}
+      Подати заявку
     </button>
   )
 }
@@ -107,12 +107,10 @@ function Sidebar({
   initiative,
   hasApplied,
   onApply,
-  isPending,
 }: {
   initiative: Initiative
   hasApplied: boolean
   onApply: () => void
-  isPending: boolean
 }) {
   const isVerified = initiative.organization.status === 'VERIFIED'
 
@@ -139,7 +137,6 @@ function Sidebar({
           initiative={initiative}
           hasApplied={hasApplied}
           onApply={onApply}
-          isPending={isPending}
         />
         <p className="text-center text-xs text-muted">
           Реакція організації — протягом кількох днів
@@ -163,8 +160,9 @@ function Sidebar({
 export default function InitiativeDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { isVolunteer } = useAuth()
-  const queryClient = useQueryClient()
   const [hasApplied, setHasApplied] = useState(false)
+  const [showModal, setShowModal] = useState(false)
+  const [alreadyAppliedBanner, setAlreadyAppliedBanner] = useState(false)
 
   const { data: initiative, isLoading, isError } = useQuery({
     queryKey: ['initiative', id],
@@ -179,18 +177,16 @@ export default function InitiativeDetailPage() {
     select: data => data.filter(i => i.id !== id).slice(0, 3),
   })
 
-  const applyMutation = useMutation({
-    mutationFn: () => submitApplication(id!),
-    onSuccess: () => {
-      setHasApplied(true)
-      queryClient.invalidateQueries({ queryKey: ['applications'] })
-    },
-    onError: (err: { response?: { status?: number } }) => {
-      if (err?.response?.status === 409) {
-        setHasApplied(true)
-      }
-    },
-  })
+  function handleApplied() {
+    setHasApplied(true)
+    setShowModal(false)
+  }
+
+  function handleAlreadyApplied() {
+    setHasApplied(true)
+    setShowModal(false)
+    setAlreadyAppliedBanner(true)
+  }
 
   if (isLoading) {
     return (
@@ -291,9 +287,13 @@ export default function InitiativeDetailPage() {
                 <Sidebar
                   initiative={initiative}
                   hasApplied={hasApplied}
-                  onApply={() => applyMutation.mutate()}
-                  isPending={applyMutation.isPending}
+                  onApply={() => setShowModal(true)}
                 />
+                {alreadyAppliedBanner && (
+                  <p className="mt-3 text-center text-xs text-accent">
+                    Заявку вже подано
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -314,6 +314,15 @@ export default function InitiativeDetailPage() {
           )}
         </div>
       </main>
+
+      {showModal && (
+        <ApplicationFormModal
+          initiative={initiative}
+          onClose={() => setShowModal(false)}
+          onSuccess={handleApplied}
+          onAlreadyApplied={handleAlreadyApplied}
+        />
+      )}
 
       <Footer />
     </div>

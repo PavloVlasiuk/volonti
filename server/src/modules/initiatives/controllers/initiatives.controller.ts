@@ -18,6 +18,7 @@ import { InitiativeDto } from '../dtos/initiative.dto';
 import { CreateInitiativeDto } from '../dtos/create-initiative.dto';
 import { UpdateInitiativeDto } from '../dtos/update-initiative.dto';
 import { UpdateInitiativeStatusDto } from '../dtos/update-initiative-status.dto';
+import { CompleteInitiativeDto } from '../dtos/complete-initiative.dto';
 import { FilterInitiativesDto } from '../dtos/filter-initiatives.dto';
 import { ApplicationDto } from '../../applications/dtos/application.dto';
 
@@ -68,6 +69,16 @@ export class InitiativesController {
     @Body() dto: UpdateInitiativeStatusDto,
   ): Promise<InitiativeDto> {
     return this.initiativesService.updateStatus(id, orgId, dto);
+  }
+
+  @Post(':id/complete')
+  @OrgVerifiedAuth()
+  complete(
+    @Param('id', ParseUUIDPipe) id: string,
+    @GetUser('id') orgId: string,
+    @Body() dto: CompleteInitiativeDto,
+  ): Promise<InitiativeDto> {
+    return this.initiativesService.complete(id, orgId, dto);
   }
 
   @Delete(':id')

@@ -8,9 +8,11 @@ import Footer from '../components/Footer'
 import Input from '../components/Input'
 import Button from '../components/Button'
 import Spinner from '../components/Spinner'
-import { getProfile, updateProfile } from '../api/profile.api'
+import { getProfile, updateProfile, getAchievements } from '../api/profile.api'
 import { enableTwoFa, disableTwoFa } from '../api/auth.api'
 import { getCategories } from '../api/categories.api'
+import { downloadCertificate } from '../api/applications.api'
+import { formatDate } from '../utils/formatDate'
 
 const FORMAT_OPTIONS = [
   { label: 'Дистанційно', value: 'REMOTE' },
@@ -42,6 +44,11 @@ export default function ProfilePage() {
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
     queryFn: getCategories,
+  })
+
+  const { data: achievements } = useQuery({
+    queryKey: ['achievements'],
+    queryFn: getAchievements,
   })
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
@@ -212,6 +219,69 @@ export default function ProfilePage() {
               </div>
             </form>
           </div>
+
+          {/* Achievements */}
+          {achievements && achievements.completedCount > 0 && (
+            <div className="rounded-2xl bg-surface border border-white/[0.06] p-6 mb-6">
+              <h2 className="mb-4 text-base font-semibold text-white">Мої досягнення</h2>
+
+              <div className="grid grid-cols-3 gap-3 mb-5">
+                <div className="rounded-xl bg-bg border border-white/[0.06] px-4 py-3 text-center">
+                  <p className="text-2xl font-bold text-accent">
+                    {achievements.totalHours.toFixed(1)}
+                  </p>
+                  <p className="mt-1 text-xs text-muted">годин</p>
+                </div>
+                <div className="rounded-xl bg-bg border border-white/[0.06] px-4 py-3 text-center">
+                  <p className="text-2xl font-bold text-accent">
+                    {achievements.completedCount}
+                  </p>
+                  <p className="mt-1 text-xs text-muted">завершених</p>
+                </div>
+                <div className="rounded-xl bg-bg border border-white/[0.06] px-4 py-3 text-center">
+                  <div className="flex flex-wrap items-center justify-center gap-1 min-h-[1.75rem]">
+                    {achievements.badges.length === 0 ? (
+                      <span className="text-xs text-muted">—</span>
+                    ) : (
+                      achievements.badges.map((b) => (
+                        <span
+                          key={b}
+                          className="rounded-full bg-accent/10 border border-accent/30 px-2 py-0.5 text-xs font-medium text-accent"
+                        >
+                          {b}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-muted">бейджі</p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                {achievements.completed.map((c) => (
+                  <div
+                    key={c.applicationId}
+                    className="flex items-center gap-3 rounded-xl border border-white/[0.06] px-4 py-3"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white line-clamp-1">
+                        {c.initiativeTitle}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted">
+                        {c.organizationName} · {formatDate(c.completedAt)} · {c.hours.toFixed(1)} год
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => downloadCertificate(c.applicationId)}
+                      className="text-xs font-medium text-accent hover:underline shrink-0"
+                    >
+                      Сертифікат ↓
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* 2FA card */}
           <div className="rounded-2xl bg-surface border border-white/[0.06] p-6">

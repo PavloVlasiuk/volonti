@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   forwardRef,
   Inject,
@@ -7,16 +8,22 @@ import {
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { FormatPreference, FormatType } from '../../../common/enums';
+import {
+  FormatPreference,
+  FormatType,
+  InitiativeStatus,
+} from '../../../common/enums';
 import { OrganizationsService } from '../../organizations/services/organizations.service';
 import { VolunteerProfilesService } from '../../volunteer-profiles/services/volunteer-profiles.service';
 import { MailService } from '../../mail/services/mail.service';
 import { VolunteerInterest } from '../../volunteer-profiles/entities/volunteer-interest.entity';
 import { InitiativesRepository } from '../repositories/initiatives.repository';
+import { Initiative } from '../entities/initiative.entity';
 import { InitiativeDto } from '../dtos/initiative.dto';
 import { CreateInitiativeDto } from '../dtos/create-initiative.dto';
 import { UpdateInitiativeDto } from '../dtos/update-initiative.dto';
 import { UpdateInitiativeStatusDto } from '../dtos/update-initiative-status.dto';
+import { CompleteInitiativeDto } from '../dtos/complete-initiative.dto';
 import { Application } from '../../applications/entities/application.entity';
 import { ApplicationDto } from '../../applications/dtos/application.dto';
 import { FilterInitiativesDto } from '../dtos/filter-initiatives.dto';
@@ -133,6 +140,51 @@ export class InitiativesService {
     return await this.initiativesRepository.findByIdWithRelations(id);
   }
 
+  async complete(
+    id: string,
+    userId: string,
+    dto: CompleteInitiativeDto,
+  ): Promise<InitiativeDto> {
+    const existing = await this.initiativesRepository.findByIdWithRelations(id);
+    if (!existing) throw new NotFoundException('Initiative not found');
+
+    const org = await this.organizationsService.findById(userId);
+    if (existing.organization.id !== org?.id) {
+      throw new ForbiddenException('Access denied');
+    }
+    if (
+      existing.status !== InitiativeStatus.ACTIVE &&
+      existing.status !== InitiativeStatus.CLOSED
+    ) {
+      throw new BadRequestException('Initiative is already completed');
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      const now = new Date();
+      for (const entry of dto.participations) {
+        await manager
+          .createQueryBuilder()
+          .update(Application)
+          .set({
+            participated: entry.participated,
+            hoursLogged: entry.hours,
+            completedAt: now,
+          })
+          .where('id = :id AND initiative_id = :initiativeId', {
+            id: entry.applicationId,
+            initiativeId: id,
+          })
+          .execute();
+      }
+      await manager.update(Initiative, id, {
+        status: InitiativeStatus.COMPLETED,
+        completedAt: now,
+      });
+    });
+
+    return this.initiativesRepository.findByIdWithRelations(id);
+  }
+
   async remove(id: string, userId: string): Promise<void> {
     const existingDto =
       await this.initiativesRepository.findByIdWithRelations(id);
@@ -159,6 +211,9 @@ export class InitiativesService {
       .createQueryBuilder('a')
       .innerJoinAndSelect('a.volunteerProfile', 'vp')
       .innerJoinAndSelect('a.initiative', 'i')
+      .leftJoinAndSelect('i.organization', 'org')
+      .leftJoinAndSelect('vp.interests', 'vi')
+      .leftJoinAndSelect('vi.category', 'cat')
       .where('i.id = :initiativeId', { initiativeId })
       .orderBy('a.createdAt', 'DESC')
       .getMany();

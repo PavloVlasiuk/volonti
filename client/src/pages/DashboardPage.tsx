@@ -7,32 +7,38 @@ import Badge from '../components/Badge'
 import Button from '../components/Button'
 import Card from '../components/Card'
 import Spinner from '../components/Spinner'
+import CompleteInitiativeModal from '../components/CompleteInitiativeModal'
 import { getMyInitiatives, closeInitiative } from '../api/initiatives.api'
 import { getOrgProfile } from '../api/organizations.api'
 import { formatDate } from '../utils/formatDate'
 import type { Initiative } from '../types/initiative.types'
 
-const STATUS_BADGE: Record<string, 'active' | 'closed'> = {
+const STATUS_BADGE: Record<string, 'active' | 'closed' | 'accepted'> = {
   ACTIVE: 'active',
   CLOSED: 'closed',
+  COMPLETED: 'accepted',
 }
 
 const STATUS_LABEL: Record<string, string> = {
   ACTIVE: 'Активна',
   CLOSED: 'Закрита',
+  COMPLETED: 'Завершена',
 }
 
 function InitiativeRow({
   initiative,
   onClose,
+  onComplete,
   isClosing,
 }: {
   initiative: Initiative
   onClose: (id: string) => void
+  onComplete: (initiative: Initiative) => void
   isClosing: boolean
 }) {
   const [confirming, setConfirming] = useState(false)
   const isActive = initiative.status === 'ACTIVE'
+  const isClosed = initiative.status === 'CLOSED'
 
   return (
     <Card className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4">
@@ -64,6 +70,14 @@ function InitiativeRow({
           >
             Редагувати
           </Link>
+        )}
+        {(isActive || isClosed) && (
+          <button
+            onClick={() => onComplete(initiative)}
+            className="text-xs text-accent hover:underline"
+          >
+            Завершити ✓
+          </button>
         )}
         {isActive && !confirming && (
           <button
@@ -99,6 +113,7 @@ function InitiativeRow({
 export default function DashboardPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [completingInitiative, setCompletingInitiative] = useState<Initiative | null>(null)
 
   const { data: org, isLoading: orgLoading } = useQuery({
     queryKey: ['orgProfile'],
@@ -172,6 +187,7 @@ export default function DashboardPage() {
                   key={initiative.id}
                   initiative={initiative}
                   onClose={(id) => closeMutation.mutate(id)}
+                  onComplete={(i) => setCompletingInitiative(i)}
                   isClosing={closeMutation.isPending}
                 />
               ))}
@@ -179,6 +195,14 @@ export default function DashboardPage() {
           )}
         </div>
       </main>
+
+      {completingInitiative && (
+        <CompleteInitiativeModal
+          initiativeId={completingInitiative.id}
+          initiativeTitle={completingInitiative.title}
+          onClose={() => setCompletingInitiative(null)}
+        />
+      )}
 
       <Footer />
     </div>

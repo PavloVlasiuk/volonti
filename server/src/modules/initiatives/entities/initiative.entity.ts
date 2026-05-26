@@ -46,6 +46,12 @@ export class Initiative extends BaseEntity {
   })
   status: InitiativeStatus;
 
+  @Column({ name: 'slots_needed', type: 'smallint', nullable: true })
+  slotsNeeded: number | null;
+
+  @Column({ name: 'completed_at', type: 'timestamptz', nullable: true })
+  completedAt: Date | null;
+
   @Column({ name: 'organization_id' })
   organizationId: string;
 

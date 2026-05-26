@@ -4,9 +4,9 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import Badge from '../components/Badge'
 import Spinner from '../components/Spinner'
-import { getMyApplications } from '../api/applications.api'
+import { getMyApplications, downloadCertificate } from '../api/applications.api'
 import { formatDate } from '../utils/formatDate'
-import type { ApplicationStatus } from '../types/application.types'
+import type { Application, ApplicationStatus } from '../types/application.types'
 
 const STATUS_BADGE: Record<ApplicationStatus, 'pending' | 'accepted' | 'rejected'> = {
   PENDING: 'pending',
@@ -18,6 +18,51 @@ const STATUS_LABEL: Record<ApplicationStatus, string> = {
   PENDING: 'Очікує',
   ACCEPTED: 'Прийнято',
   REJECTED: 'Відхилено',
+}
+
+function ApplicationRow({ app }: { app: Application }) {
+  const isCompleted = app.initiative
+    ? Boolean(app.completedAt)
+    : false
+  const showCertificate = isCompleted && app.participated === true
+
+  return (
+    <div className="rounded-xl bg-surface border border-white/[0.06] px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="min-w-0">
+        <p className="font-semibold text-white leading-snug line-clamp-1">
+          {app.initiative.title}
+        </p>
+        <p className="mt-0.5 text-sm text-muted">
+          {app.initiative.organization.name} · {formatDate(app.createdAt)}
+        </p>
+        {showCertificate && (
+          <p className="mt-1 text-xs text-accent">
+            ✓ Завершено · {(app.hoursLogged ?? 0).toFixed(1)} год
+          </p>
+        )}
+      </div>
+
+      <div className="flex items-center gap-3 shrink-0">
+        <Badge variant={STATUS_BADGE[app.status]}>
+          {STATUS_LABEL[app.status]}
+        </Badge>
+        {showCertificate && (
+          <button
+            onClick={() => downloadCertificate(app.id)}
+            className="text-sm font-medium text-accent hover:underline whitespace-nowrap"
+          >
+            Сертифікат ↓
+          </button>
+        )}
+        <Link
+          to={`/initiatives/${app.initiative.id}`}
+          className="text-sm font-medium text-accent hover:underline whitespace-nowrap"
+        >
+          Переглянути →
+        </Link>
+      </div>
+    </div>
+  )
 }
 
 export default function ApplicationsPage() {
@@ -54,31 +99,7 @@ export default function ApplicationsPage() {
           ) : (
             <div className="flex flex-col gap-3">
               {applications.map(app => (
-                <div
-                  key={app.id}
-                  className="rounded-xl bg-surface border border-white/[0.06] px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-                >
-                  <div className="min-w-0">
-                    <p className="font-semibold text-white leading-snug line-clamp-1">
-                      {app.initiative.title}
-                    </p>
-                    <p className="mt-0.5 text-sm text-muted">
-                      {app.initiative.organization.name} · {formatDate(app.createdAt)}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-3 shrink-0">
-                    <Badge variant={STATUS_BADGE[app.status]}>
-                      {STATUS_LABEL[app.status]}
-                    </Badge>
-                    <Link
-                      to={`/initiatives/${app.initiative.id}`}
-                      className="text-sm font-medium text-accent hover:underline whitespace-nowrap"
-                    >
-                      Переглянути →
-                    </Link>
-                  </div>
-                </div>
+                <ApplicationRow key={app.id} app={app} />
               ))}
             </div>
           )}

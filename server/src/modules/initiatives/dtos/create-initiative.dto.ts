@@ -51,4 +51,10 @@ export class CreateInitiativeDto {
   @IsDateString()
   @IsOptional()
   endsAt?: string;
+
+  @IsInt()
+  @Min(1)
+  @Max(10000)
+  @IsOptional()
+  slotsNeeded?: number;
 }

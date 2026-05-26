@@ -49,3 +49,17 @@ export async function getInitiativeApplications(id: string): Promise<Application
   const res = await client.get(`/initiatives/${id}/applications`)
   return res.data
 }
+
+export interface ParticipationEntry {
+  applicationId: string
+  participated: boolean
+  hours: number
+}
+
+export async function completeInitiative(
+  id: string,
+  dto: { participations: ParticipationEntry[] }
+): Promise<Initiative> {
+  const res = await client.post(`/initiatives/${id}/complete`, dto)
+  return res.data
+}

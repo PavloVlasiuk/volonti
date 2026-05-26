@@ -13,6 +13,7 @@ import { GetUser } from '../../../common/decorators/get-user.decorator';
 import { UserRole } from '../../../common/enums';
 import { ApplicationsService } from '../services/applications.service';
 import { ApplicationDto } from '../dtos/application.dto';
+import { SubmitApplicationDto } from '../dtos/submit-application.dto';
 import { UpdateApplicationStatusDto } from '../dtos/update-application-status.dto';
 
 @Controller('')
@@ -24,8 +25,9 @@ export class ApplicationsController {
   submit(
     @Param('id', ParseUUIDPipe) initiativeId: string,
     @GetUser('id') userId: string,
+    @Body() dto: SubmitApplicationDto,
   ): Promise<ApplicationDto> {
-    return this.applicationsService.submit(initiativeId, userId);
+    return this.applicationsService.submit(initiativeId, userId, dto);
   }
 
   @Patch('applications/:id')

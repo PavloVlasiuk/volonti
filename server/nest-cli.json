@@ -4,7 +4,9 @@
   "sourceRoot": "src",
   "compilerOptions": {
     "deleteOutDir": true,
-    "assets": [],
+    "assets": [
+      { "include": "../assets/fonts/*.ttf", "outDir": "dist/assets" }
+    ],
     "watchAssets": true
   }
 }

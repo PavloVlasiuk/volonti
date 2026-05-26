@@ -36,6 +36,7 @@ export enum InitiativeType {
 export enum InitiativeStatus {
   ACTIVE = 'ACTIVE',
   CLOSED = 'CLOSED',
+  COMPLETED = 'COMPLETED',
 }
 
 export enum ApplicationStatus {
@@ -47,4 +48,11 @@ export enum ApplicationStatus {
 export enum ActorType {
   USER = 'USER',
   ORGANIZATION = 'ORGANIZATION',
+}
+
+export enum AvailabilitySlot {
+  WEEKDAYS = 'WEEKDAYS',
+  WEEKENDS = 'WEEKENDS',
+  EVENINGS = 'EVENINGS',
+  FULL_TIME = 'FULL_TIME',
 }

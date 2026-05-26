@@ -4,11 +4,14 @@ import { DataSource } from 'typeorm';
 import { BaseRepositoryWrapper } from '../../../common/repositories/base.repository';
 import { Application } from '../entities/application.entity';
 import { ApplicationDto } from '../dtos/application.dto';
+import { ApplicationStatus } from '../../../common/enums';
 
 const APPLICATION_RELATIONS = [
   'initiative',
   'initiative.organization',
   'volunteerProfile',
+  'volunteerProfile.interests',
+  'volunteerProfile.interests.category',
 ];
 
 @Injectable()
@@ -44,6 +47,15 @@ export class ApplicationsRepository extends BaseRepositoryWrapper<
       where: { initiative: { id: initiativeId } },
       relations: APPLICATION_RELATIONS,
       order: { createdAt: 'DESC' },
+    });
+  }
+
+  countAccepted(initiativeId: string): Promise<number> {
+    return this.count({
+      where: {
+        initiativeId,
+        status: ApplicationStatus.ACCEPTED,
+      },
     });
   }
 }
