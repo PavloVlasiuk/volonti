@@ -27,4 +27,21 @@ export interface Organization {
   rejectionReason: string | null
   verifiedAt: string | null
   createdAt: string
+  avgRating: number | null
+  reviewCount: number
+}
+
+export interface OrganizationPublic {
+  id: string
+  name: string
+  type: OrgType
+  contactPerson: string
+  status: OrgStatus
+  verifiedAt: string | null
+  createdAt: string
+  avgRating: number | null
+  reviewCount: number
+  activeInitiatives: import('./initiative.types').Initiative[]
+  completedInitiatives: import('./initiative.types').Initiative[]
+  recentReviews: import('./review.types').Review[]
 }

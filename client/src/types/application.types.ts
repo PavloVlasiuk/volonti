@@ -45,6 +45,8 @@ export interface Application {
     formatPreference: FormatPreference
     bio: string | null
     interests: { id: string; name: string }[]
+    avgRating: number | null
+    reviewCount: number
   }
 }
 

@@ -1,17 +1,23 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, forwardRef } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, SelectQueryBuilder } from 'typeorm';
 import { BaseRepositoryWrapper } from '../../../common/repositories/base.repository';
 import {
   ApplicationStatus,
-  FormatPreference,
-  FormatType,
   InitiativeStatus,
+  ReviewParty,
 } from '../../../common/enums';
 import { Initiative } from '../entities/initiative.entity';
 import { InitiativeDto } from '../dtos/initiative.dto';
 import { FilterInitiativesDto } from '../dtos/filter-initiatives.dto';
 import { VolunteerProfileDto } from '../../volunteer-profiles/dtos/volunteer-profile.dto';
+import { ReviewsRepository } from '../../reviews/repositories/reviews.repository';
+
+export type RatedInitiative = Initiative & {
+  acceptedCount?: number;
+  organizationAvgRating?: number | null;
+  organizationReviewCount?: number;
+};
 
 @Injectable()
 export class InitiativesRepository extends BaseRepositoryWrapper<
@@ -20,7 +26,11 @@ export class InitiativesRepository extends BaseRepositoryWrapper<
 > {
   protected dtoClass = InitiativeDto;
 
-  constructor(@InjectDataSource() dataSource: DataSource) {
+  constructor(
+    @InjectDataSource() dataSource: DataSource,
+    @Inject(forwardRef(() => ReviewsRepository))
+    private readonly reviewsRepository: ReviewsRepository,
+  ) {
     super(Initiative, dataSource.createEntityManager());
   }
 
@@ -39,9 +49,31 @@ export class InitiativesRepository extends BaseRepositoryWrapper<
       );
   }
 
+  private async toDtosWithRatings(
+    entities: Initiative[],
+  ): Promise<InitiativeDto[]> {
+    if (entities.length === 0) return [];
+    const orgIds = Array.from(
+      new Set(entities.map((e) => e.organization?.id).filter(Boolean)),
+    );
+    const ratings = await this.reviewsRepository.aggregateForMany(
+      ReviewParty.ORGANIZATION,
+      orgIds,
+    );
+    return entities.map((e) => {
+      const rating = e.organization?.id
+        ? ratings.get(e.organization.id)
+        : undefined;
+      const enriched: RatedInitiative = e as RatedInitiative;
+      enriched.organizationAvgRating = rating?.avg ?? null;
+      enriched.organizationReviewCount = rating?.count ?? 0;
+      return new InitiativeDto(enriched);
+    });
+  }
+
   async findAllWithFilters(
     filters: FilterInitiativesDto,
-  ): Promise<InitiativeDto[]> {
+  ): Promise<{ items: InitiativeDto[]; total: number }> {
     const qb = this.baseQuery().where('i.status = :status', {
       status: InitiativeStatus.ACTIVE,
     });
@@ -58,19 +90,22 @@ export class InitiativesRepository extends BaseRepositoryWrapper<
         organizationId: filters.organizationId,
       });
 
-    const entities = await qb.orderBy('i.createdAt', 'DESC').getMany();
-    return entities.map(
-      (e) => new InitiativeDto(e as Initiative & { acceptedCount?: number }),
-    );
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 12;
+    qb.orderBy('i.createdAt', 'DESC').skip((page - 1) * limit).take(limit);
+
+    const [entities, total] = await qb.getManyAndCount();
+    const items = await this.toDtosWithRatings(entities);
+    return { items, total };
   }
 
   async findByIdWithRelations(id: string): Promise<InitiativeDto | null> {
     const entity = await this.baseQuery()
       .where('i.id = :id', { id })
       .getOne();
-    return entity
-      ? new InitiativeDto(entity as Initiative & { acceptedCount?: number })
-      : null;
+    if (!entity) return null;
+    const [dto] = await this.toDtosWithRatings([entity]);
+    return dto;
   }
 
   async findByOrganization(organizationId: string): Promise<InitiativeDto[]> {
@@ -78,34 +113,22 @@ export class InitiativesRepository extends BaseRepositoryWrapper<
       .where('org.id = :organizationId', { organizationId })
       .orderBy('i.createdAt', 'DESC')
       .getMany();
-    return entities.map(
-      (e) => new InitiativeDto(e as Initiative & { acceptedCount?: number }),
-    );
+    return this.toDtosWithRatings(entities);
   }
 
-  async findMatchingForVolunteer(
+  async findCandidateEntitiesForFeed(
     profile: VolunteerProfileDto,
-  ): Promise<InitiativeDto[]> {
-    const categoryIds = profile.interests.map((i) => i.id);
+    userId: string,
+    filters: {
+      category?: string;
+      city?: string;
+      format?: string;
+      type?: string;
+    } = {},
+  ): Promise<RatedInitiative[]> {
     const qb = this.baseQuery().where('i.status = :status', {
       status: InitiativeStatus.ACTIVE,
     });
-
-    if (categoryIds.length) {
-      qb.andWhere('cat.id IN (:...categoryIds)', { categoryIds });
-    }
-
-    if (profile.formatPreference === FormatPreference.REMOTE) {
-      qb.andWhere('i.format = :format', { format: FormatType.REMOTE });
-    } else if (
-      profile.formatPreference === FormatPreference.ON_SITE &&
-      profile.city
-    ) {
-      qb.andWhere('i.format = :format AND i.city ILIKE :city', {
-        format: FormatType.ON_SITE,
-        city: profile.city,
-      });
-    }
 
     if (profile.age) {
       qb.andWhere('(i.minAge IS NULL OR i.minAge <= :age)', {
@@ -113,9 +136,48 @@ export class InitiativesRepository extends BaseRepositoryWrapper<
       });
     }
 
-    const entities = await qb.orderBy('i.createdAt', 'DESC').getMany();
-    return entities.map(
-      (e) => new InitiativeDto(e as Initiative & { acceptedCount?: number }),
+    qb.andWhere(
+      `i.id NOT IN (
+        SELECT a.initiative_id FROM applications a
+        WHERE a.volunteer_profile_id = :volunteerProfileId
+      )`,
+      { volunteerProfileId: profile.id },
     );
+
+    qb.andWhere(
+      `i.id NOT IN (
+        SELECT d.initiative_id FROM initiative_dismissals d
+        WHERE d.user_id = :userId
+      )`,
+      { userId },
+    );
+
+    if (filters.category)
+      qb.andWhere('cat.id = :category', { category: filters.category });
+    if (filters.city)
+      qb.andWhere('i.city ILIKE :city', { city: `%${filters.city}%` });
+    if (filters.format)
+      qb.andWhere('i.format = :format', { format: filters.format });
+    if (filters.type) qb.andWhere('i.type = :type', { type: filters.type });
+
+    const entities = await qb.orderBy('i.createdAt', 'DESC').getMany();
+    if (entities.length === 0) return [];
+
+    const orgIds = Array.from(
+      new Set(entities.map((e) => e.organization?.id).filter(Boolean)),
+    );
+    const ratings = await this.reviewsRepository.aggregateForMany(
+      ReviewParty.ORGANIZATION,
+      orgIds,
+    );
+    for (const e of entities) {
+      const rating = e.organization?.id
+        ? ratings.get(e.organization.id)
+        : undefined;
+      const enriched = e as RatedInitiative;
+      enriched.organizationAvgRating = rating?.avg ?? null;
+      enriched.organizationReviewCount = rating?.count ?? 0;
+    }
+    return entities as RatedInitiative[];
   }
 }

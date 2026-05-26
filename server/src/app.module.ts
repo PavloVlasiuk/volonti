@@ -14,6 +14,8 @@ import { InitiativesModule } from './modules/initiatives/initiatives.module';
 import { ApplicationsModule } from './modules/applications/applications.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { CertificatesModule } from './modules/certificates/certificates.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
+import { MatchingModule } from './modules/matching/matching.module';
 
 @Module({
   imports: [
@@ -43,6 +45,8 @@ import { CertificatesModule } from './modules/certificates/certificates.module';
     ApplicationsModule,
     AdminModule,
     CertificatesModule,
+    ReviewsModule,
+    MatchingModule,
   ],
   providers: [],
 })

@@ -1,14 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { AxiosError } from 'axios'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import Badge from '../components/Badge'
 import Button from '../components/Button'
 import Card from '../components/Card'
 import Spinner from '../components/Spinner'
+import ReviewForm from '../components/ReviewForm'
 import { getInitiative, getInitiativeApplications } from '../api/initiatives.api'
 import { updateApplicationStatus } from '../api/applications.api'
+import {
+  createReviewFromOrganization,
+  getOwnReviewFromOrganization,
+} from '../api/reviews.api'
 import {
   AvailabilitySlot,
   type Application,
@@ -48,6 +54,8 @@ function ApplicationRow({
   onReject,
   isUpdating,
   initiativeCompleted,
+  initiativeId,
+  onLeaveReview,
 }: {
   app: Application
   expanded: boolean
@@ -56,10 +64,19 @@ function ApplicationRow({
   onReject: (id: string) => void
   isUpdating: boolean
   initiativeCompleted: boolean
+  initiativeId: string
+  onLeaveReview: (app: Application) => void
 }) {
   const isDecided = app.status !== 'PENDING'
   const fullName = `${app.volunteer.firstName} ${app.volunteer.lastName}`
   const profile = app.volunteer
+  const canReview = initiativeCompleted && app.participated === true
+
+  const { data: ownReview } = useQuery({
+    queryKey: ['ownReviewOrg', initiativeId, app.volunteer.id],
+    queryFn: () => getOwnReviewFromOrganization(initiativeId, app.volunteer.id),
+    enabled: canReview,
+  })
 
   const participationSummary = initiativeCompleted
     ? app.participated === true
@@ -77,7 +94,17 @@ function ApplicationRow({
         className="w-full px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4 text-left hover:bg-white/[0.02] transition-colors"
       >
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-white">{fullName}</p>
+          <p className="font-semibold text-white flex items-center gap-2 flex-wrap">
+            <span>{fullName}</span>
+            {profile.avgRating !== null && (
+              <span className="text-xs text-accent font-medium">
+                ★ {profile.avgRating.toFixed(1)}
+                <span className="text-muted ml-1">
+                  · {profile.reviewCount} відгуків
+                </span>
+              </span>
+            )}
+          </p>
           <p className="mt-0.5 text-xs text-muted">
             Подано: {new Date(app.createdAt).toLocaleDateString('uk-UA')}
           </p>
@@ -119,6 +146,24 @@ function ApplicationRow({
                 Відхилити
               </Button>
             </>
+          )}
+
+          {canReview && !ownReview && (
+            <Button
+              size="sm"
+              variant="outlined"
+              onClick={(e) => {
+                e.stopPropagation()
+                onLeaveReview(app)
+              }}
+            >
+              Залишити відгук про волонтера
+            </Button>
+          )}
+          {canReview && ownReview && (
+            <span className="text-xs text-muted whitespace-nowrap">
+              Відгук: ★ {ownReview.rating}
+            </span>
           )}
 
           <span className={`text-muted transition-transform ${expanded ? 'rotate-180' : ''}`}>
@@ -226,10 +271,71 @@ function ApplicationRow({
   )
 }
 
+function ReviewModal({
+  initiativeId,
+  app,
+  onClose,
+}: {
+  initiativeId: string
+  app: Application
+  onClose: () => void
+}) {
+  const queryClient = useQueryClient()
+  const [error, setError] = useState<string | null>(null)
+
+  const mutation = useMutation({
+    mutationFn: (payload: { rating: number; comment?: string }) =>
+      createReviewFromOrganization(initiativeId, {
+        ...payload,
+        targetId: app.volunteer.id,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['ownReviewOrg', initiativeId, app.volunteer.id],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['initiative-applications', initiativeId],
+      })
+      onClose()
+    },
+    onError: (err: AxiosError<{ message?: string }>) => {
+      if (err.response?.status === 409) {
+        setError('Ви вже залишили відгук про цього волонтера')
+      } else {
+        setError(err.response?.data?.message ?? 'Не вдалося надіслати відгук')
+      }
+    },
+  })
+
+  const fullName = `${app.volunteer.firstName} ${app.volunteer.lastName}`
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-xl bg-surface border border-white/[0.08] p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-xs text-muted mb-1">Відгук про волонтера</p>
+        <p className="text-base font-semibold text-white mb-4">{fullName}</p>
+        <ReviewForm
+          onSubmit={(payload) => mutation.mutate(payload)}
+          onCancel={onClose}
+          submitting={mutation.isPending}
+          error={error}
+        />
+      </div>
+    </div>
+  )
+}
+
 export default function InitiativeApplicationsPage() {
   const { id } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [reviewing, setReviewing] = useState<Application | null>(null)
 
   const { data: initiative, isLoading: loadingInit } = useQuery({
     queryKey: ['initiative', id],
@@ -342,12 +448,22 @@ export default function InitiativeApplicationsPage() {
                   }
                   isUpdating={updateMutation.isPending}
                   initiativeCompleted={initiative?.status === 'COMPLETED'}
+                  initiativeId={id!}
+                  onLeaveReview={setReviewing}
                 />
               ))}
             </div>
           )}
         </div>
       </main>
+
+      {reviewing && id && (
+        <ReviewModal
+          initiativeId={id}
+          app={reviewing}
+          onClose={() => setReviewing(null)}
+        />
+      )}
 
       <Footer />
     </div>

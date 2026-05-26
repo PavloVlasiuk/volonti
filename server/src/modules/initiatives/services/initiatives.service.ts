@@ -6,20 +6,20 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import {
-  FormatPreference,
-  FormatType,
-  InitiativeStatus,
-} from '../../../common/enums';
+import { EnvironmentVariables } from '../../../env.variables';
+import { InitiativeStatus, ReviewParty } from '../../../common/enums';
 import { OrganizationsService } from '../../organizations/services/organizations.service';
 import { VolunteerProfilesService } from '../../volunteer-profiles/services/volunteer-profiles.service';
 import { MailService } from '../../mail/services/mail.service';
 import { VolunteerInterest } from '../../volunteer-profiles/entities/volunteer-interest.entity';
 import { InitiativesRepository } from '../repositories/initiatives.repository';
+import { InitiativeDismissalsRepository } from '../repositories/initiative-dismissals.repository';
 import { Initiative } from '../entities/initiative.entity';
 import { InitiativeDto } from '../dtos/initiative.dto';
+import { FeedItemDto } from '../dtos/feed-item.dto';
 import { CreateInitiativeDto } from '../dtos/create-initiative.dto';
 import { UpdateInitiativeDto } from '../dtos/update-initiative.dto';
 import { UpdateInitiativeStatusDto } from '../dtos/update-initiative-status.dto';
@@ -27,39 +27,60 @@ import { CompleteInitiativeDto } from '../dtos/complete-initiative.dto';
 import { Application } from '../../applications/entities/application.entity';
 import { ApplicationDto } from '../../applications/dtos/application.dto';
 import { FilterInitiativesDto } from '../dtos/filter-initiatives.dto';
-import { VolunteerProfileDto } from '../../volunteer-profiles/dtos/volunteer-profile.dto';
-
-function computeMatchScore(
-  dto: InitiativeDto,
-  profile: VolunteerProfileDto,
-): number {
-  const categoryIds = profile.interests.map((i) => i.id);
-  const criteria = [
-    categoryIds.includes(dto.categoryId) ? 2 : 0,
-    profile.formatPreference === FormatPreference.ANY ||
-    (profile.formatPreference as string) === (dto.format as string)
-      ? 1
-      : 0,
-    dto.format === FormatType.ON_SITE && profile.city
-      ? profile.city.toLowerCase() === dto.city?.toLowerCase()
-        ? 1
-        : 0
-      : 1,
-    !dto.minAge || (profile.age !== null && profile.age >= dto.minAge) ? 1 : 0,
-  ];
-  return Math.round((criteria.reduce((a, b) => a + b, 0) / 5) * 100);
-}
+import { FeedQueryDto } from '../dtos/feed-query.dto';
+import { PaginatedDto } from '../../../common/dtos/paginated.dto';
+import { ReviewsRepository } from '../../reviews/repositories/reviews.repository';
+import { MatchingService } from '../../matching/services/matching.service';
 
 @Injectable()
 export class InitiativesService {
   constructor(
     private readonly initiativesRepository: InitiativesRepository,
+    private readonly initiativeDismissalsRepository: InitiativeDismissalsRepository,
+    @Inject(forwardRef(() => OrganizationsService))
     private readonly organizationsService: OrganizationsService,
     @Inject(forwardRef(() => VolunteerProfilesService))
     private readonly volunteerProfilesService: VolunteerProfilesService,
     private readonly mailService: MailService,
     @InjectDataSource() private readonly dataSource: DataSource,
+    @Inject(forwardRef(() => ReviewsRepository))
+    private readonly reviewsRepository: ReviewsRepository,
+    private readonly configService: ConfigService<EnvironmentVariables>,
+    private readonly matchingService: MatchingService,
   ) {}
+
+  async dismiss(initiativeId: string, userId: string): Promise<void> {
+    const exists = await this.initiativesRepository.exist({
+      where: { id: initiativeId },
+    });
+    if (!exists) throw new NotFoundException('Initiative not found');
+    await this.initiativeDismissalsRepository.dismiss(userId, initiativeId);
+  }
+
+  private async attachVolunteerRatings(
+    apps: Application[],
+  ): Promise<ApplicationDto[]> {
+    if (apps.length === 0) return [];
+    const volunteerIds = Array.from(
+      new Set(apps.map((a) => a.volunteerProfile?.id).filter(Boolean)),
+    );
+    const ratings = await this.reviewsRepository.aggregateForMany(
+      ReviewParty.VOLUNTEER,
+      volunteerIds,
+    );
+    return apps.map((a) => {
+      const rating = a.volunteerProfile?.id
+        ? ratings.get(a.volunteerProfile.id)
+        : undefined;
+      const enriched = a as Application & {
+        volunteerAvgRating?: number | null;
+        volunteerReviewCount?: number;
+      };
+      enriched.volunteerAvgRating = rating?.avg ?? null;
+      enriched.volunteerReviewCount = rating?.count ?? 0;
+      return new ApplicationDto(enriched);
+    });
+  }
 
   async create(
     userId: string,
@@ -80,8 +101,14 @@ export class InitiativesService {
     return result;
   }
 
-  async findAll(filters: FilterInitiativesDto): Promise<InitiativeDto[]> {
-    return this.initiativesRepository.findAllWithFilters(filters);
+  async findAll(
+    filters: FilterInitiativesDto,
+  ): Promise<PaginatedDto<InitiativeDto>> {
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 12;
+    const { items, total } =
+      await this.initiativesRepository.findAllWithFilters(filters);
+    return new PaginatedDto(items, total, page, limit);
   }
 
   async getMyInitiatives(userId: string): Promise<InitiativeDto[]> {
@@ -182,7 +209,50 @@ export class InitiativesService {
       });
     });
 
+    this.requestReviews(id, existing.title, existing.organization).catch(
+      () => {},
+    );
+
     return this.initiativesRepository.findByIdWithRelations(id);
+  }
+
+  private async requestReviews(
+    initiativeId: string,
+    initiativeTitle: string,
+    organization: InitiativeDto['organization'],
+  ): Promise<void> {
+    const frontendUrl =
+      this.configService.get('FRONTEND_URL', { infer: true }) ?? '';
+
+    const volunteers = await this.dataSource
+      .getRepository(Application)
+      .createQueryBuilder('a')
+      .innerJoin('a.volunteerProfile', 'vp')
+      .innerJoin('vp.user', 'u')
+      .select('u.email', 'email')
+      .addSelect('vp.first_name', 'firstName')
+      .where('a.initiative_id = :initiativeId', { initiativeId })
+      .andWhere('a.participated = true')
+      .getRawMany<{ email: string; firstName: string }>();
+
+    const volunteerUrl = `${frontendUrl}/applications`;
+    for (const v of volunteers) {
+      this.mailService
+        .sendReviewRequest(v.email, v.firstName, initiativeTitle, volunteerUrl)
+        .catch(() => {});
+    }
+
+    if (organization?.email && volunteers.length > 0) {
+      const orgUrl = `${frontendUrl}/initiatives/${initiativeId}/applications`;
+      this.mailService
+        .sendReviewRequest(
+          organization.email,
+          organization.name,
+          initiativeTitle,
+          orgUrl,
+        )
+        .catch(() => {});
+    }
   }
 
   async remove(id: string, userId: string): Promise<void> {
@@ -217,22 +287,75 @@ export class InitiativesService {
       .where('i.id = :initiativeId', { initiativeId })
       .orderBy('a.createdAt', 'DESC')
       .getMany();
-    return apps.map((a) => new ApplicationDto(a));
+    return this.attachVolunteerRatings(apps);
   }
 
   async getFeed(
     userId: string,
-  ): Promise<Array<InitiativeDto & { matchScore: number }>> {
+    query: FeedQueryDto = {},
+  ): Promise<PaginatedDto<FeedItemDto>> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 12;
     const profile = await this.volunteerProfilesService.findByUserId(userId);
-    if (!profile || !profile.interests?.length) {
-      const all = await this.initiativesRepository.findAllWithFilters({});
-      return all.map((dto) => ({ ...dto, matchScore: 0 }));
+    if (!profile) return new PaginatedDto<FeedItemDto>([], 0, page, limit);
+
+    const affinity = await this.loadAppliedAffinity(profile.id);
+    const entities =
+      await this.initiativesRepository.findCandidateEntitiesForFeed(
+        profile,
+        userId,
+        {
+          category: query.category,
+          city: query.city,
+          format: query.format,
+          type: query.type,
+        },
+      );
+
+    const items = entities.map((entity) => {
+      const dto = new InitiativeDto(entity);
+      const { score, reasons } = this.matchingService.scoreForVolunteer(
+        dto,
+        profile,
+        affinity,
+      );
+      return new FeedItemDto(entity, score, reasons);
+    });
+
+    items.sort((a, b) => b.matchScore - a.matchScore);
+
+    const total = items.length;
+    const start = (page - 1) * limit;
+    const paged = items.slice(start, start + limit);
+    return new PaginatedDto(paged, total, page, limit);
+  }
+
+  private async loadAppliedAffinity(
+    volunteerProfileId: string,
+  ): Promise<Map<string, number>> {
+    const rows = await this.dataSource
+      .getRepository(Application)
+      .createQueryBuilder('a')
+      .innerJoin('a.initiative', 'i')
+      .select('i.category_id', 'categoryId')
+      .addSelect('COUNT(*)', 'count')
+      .where('a.volunteer_profile_id = :volunteerProfileId', {
+        volunteerProfileId,
+      })
+      .groupBy('i.category_id')
+      .getRawMany<{ categoryId: string; count: string }>();
+
+    const map = new Map<string, number>();
+    if (rows.length === 0) return map;
+
+    const counts = rows.map((r) => Number(r.count));
+    const maxCount = Math.max(...counts);
+    if (maxCount <= 0) return map;
+
+    for (const r of rows) {
+      map.set(r.categoryId, Number(r.count) / maxCount);
     }
-    const initiatives =
-      await this.initiativesRepository.findMatchingForVolunteer(profile);
-    return initiatives
-      .map((dto) => ({ ...dto, matchScore: computeMatchScore(dto, profile) }))
-      .sort((a, b) => b.matchScore - a.matchScore);
+    return map;
   }
 
   private notifyMatchingVolunteers(initiative: InitiativeDto): void {

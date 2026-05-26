@@ -15,12 +15,14 @@ import InitiativeFormPage from '../pages/InitiativeFormPage'
 import InitiativeApplicationsPage from '../pages/InitiativeApplicationsPage'
 import AdminOrganizationsPage from '../pages/AdminOrganizationsPage'
 import AdminOrganizationReviewPage from '../pages/AdminOrganizationReviewPage'
+import OrgPublicPage from '../pages/OrgPublicPage'
 
 const router = createBrowserRouter([
   // Public routes
   { path: '/', element: <LandingPage /> },
   { path: '/initiatives', element: <BrowsePage /> },
   { path: '/initiatives/:id', element: <InitiativeDetailPage /> },
+  { path: '/organizations/:id', element: <OrgPublicPage /> },
   { path: '/login', element: <LoginPage /> },
   { path: '/register/volunteer', element: <RegisterVolunteerPage /> },
   { path: '/register/organization', element: <RegisterOrganizationPage /> },

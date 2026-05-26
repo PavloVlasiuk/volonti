@@ -1,6 +1,12 @@
 import client from './client'
-import type { FeedItem, FormatPreference } from '../types/initiative.types'
+import type {
+  FeedItem,
+  FormatPreference,
+  FormatType,
+  InitiativeType,
+} from '../types/initiative.types'
 import type { AchievementsSummary } from '../types/achievement.types'
+import type { Paginated } from '../types/pagination.types'
 
 export interface VolunteerProfile {
   id: string
@@ -33,8 +39,17 @@ export async function updateProfile(data: UpdateProfileDto): Promise<VolunteerPr
   return res.data
 }
 
-export async function getFeed(): Promise<FeedItem[]> {
-  const res = await client.get('/volunteer/feed')
+export interface FeedQuery {
+  category?: string
+  city?: string
+  format?: FormatType
+  type?: InitiativeType
+  page?: number
+  limit?: number
+}
+
+export async function getFeed(query?: FeedQuery): Promise<Paginated<FeedItem>> {
+  const res = await client.get('/volunteer/feed', { params: query })
   return res.data
 }
 

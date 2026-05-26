@@ -56,3 +56,8 @@ export enum AvailabilitySlot {
   EVENINGS = 'EVENINGS',
   FULL_TIME = 'FULL_TIME',
 }
+
+export enum ReviewParty {
+  VOLUNTEER = 'VOLUNTEER',
+  ORGANIZATION = 'ORGANIZATION',
+}

@@ -7,12 +7,12 @@ import Spinner from '../components/Spinner'
 import { getInitiatives } from '../api/initiatives.api'
 import { getCategories } from '../api/categories.api'
 
-const METRICS = [
-  { value: '4 800+', label: 'Волонтери' },
-  { value: '320', label: 'Організацій' },
-  { value: '1 200+', label: 'Відкриті ініціативи' },
-  { value: '24', label: 'Міста' },
-]
+// const METRICS = [
+//   { value: '4 800+', label: 'Волонтери' },
+//   { value: '320', label: 'Організацій' },
+//   { value: '1 200+', label: 'Відкриті ініціативи' },
+//   { value: '24', label: 'Міста' },
+// ]
 
 const HOW_STEPS = [
   {
@@ -35,7 +35,7 @@ const HOW_STEPS = [
 function HeroSection() {
   return (
     <section className="pt-28 pb-20 px-4">
-      <div className="mx-auto max-w-4xl">
+      <div className="mx-auto max-w-7xl">
         <p className="mb-4 text-xs font-medium uppercase tracking-widest text-accent/80">
           Платформа активна під час війни
         </p>
@@ -65,14 +65,14 @@ function HeroSection() {
           </Link>
         </div>
 
-        <div className="flex flex-wrap gap-8">
+        {/* <div className="flex flex-wrap gap-8">
           {METRICS.map(m => (
             <div key={m.label}>
               <p className="text-2xl font-bold text-white">{m.value}</p>
               <p className="text-xs text-muted">{m.label}</p>
             </div>
           ))}
-        </div>
+        </div> */}
       </div>
     </section>
   )
@@ -182,10 +182,11 @@ function CategoriesSection() {
 }
 
 function FeaturedInitiatives() {
-  const { data: initiatives = [], isLoading } = useQuery({
-    queryKey: ['initiatives', { limit: 3, status: 'ACTIVE' }],
-    queryFn: () => getInitiatives({ limit: 3, status: 'ACTIVE' }),
+  const { data, isLoading } = useQuery({
+    queryKey: ['initiatives', { page: 1, limit: 3 }],
+    queryFn: () => getInitiatives({ page: 1, limit: 3 }),
   })
+  const initiatives = data?.items ?? []
 
   return (
     <section className="py-20 px-4 border-t border-white/[0.04]">

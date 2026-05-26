@@ -83,4 +83,18 @@ export class MailService {
       context: { code },
     });
   }
+
+  sendReviewRequest(
+    to: string,
+    name: string,
+    initiativeTitle: string,
+    reviewUrl: string,
+  ): Promise<void> {
+    return this.sendMail({
+      to,
+      subject: `Залиште відгук про "${initiativeTitle}"`,
+      template: 'review-request',
+      context: { name, initiativeTitle, reviewUrl },
+    });
+  }
 }

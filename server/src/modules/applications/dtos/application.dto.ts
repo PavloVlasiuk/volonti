@@ -36,9 +36,16 @@ export class ApplicationDto {
     formatPreference: FormatPreference;
     bio: string | null;
     interests: { id: string; name: string }[];
+    avgRating: number | null;
+    reviewCount: number;
   };
 
-  constructor(entity: Application) {
+  constructor(
+    entity: Application & {
+      volunteerAvgRating?: number | null;
+      volunteerReviewCount?: number;
+    },
+  ) {
     this.id = entity.id;
     this.status = entity.status;
     this.motivation = entity.motivation ?? '';
@@ -74,6 +81,12 @@ export class ApplicationDto {
           id: i.category?.id,
           name: i.category?.name,
         })) ?? [],
+      avgRating:
+        entity.volunteerAvgRating === undefined ||
+        entity.volunteerAvgRating === null
+          ? null
+          : Number(entity.volunteerAvgRating),
+      reviewCount: Number(entity.volunteerReviewCount ?? 0),
     };
   }
 }

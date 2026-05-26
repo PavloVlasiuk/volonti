@@ -28,11 +28,19 @@ export class InitiativeDto {
     name: string;
     status: OrgStatus;
     email: string;
+    avgRating: number | null;
+    reviewCount: number;
   };
   categoryId: string;
   categoryName: string;
 
-  constructor(entity: Initiative & { acceptedCount?: number }) {
+  constructor(
+    entity: Initiative & {
+      acceptedCount?: number;
+      organizationAvgRating?: number | null;
+      organizationReviewCount?: number;
+    },
+  ) {
     this.id = entity.id;
     this.title = entity.title;
     this.description = entity.description;
@@ -54,6 +62,12 @@ export class InitiativeDto {
       name: entity.organization?.name,
       status: entity.organization?.status,
       email: entity.organization?.email,
+      avgRating:
+        entity.organizationAvgRating === undefined ||
+        entity.organizationAvgRating === null
+          ? null
+          : Number(entity.organizationAvgRating),
+      reviewCount: Number(entity.organizationReviewCount ?? 0),
     };
     this.categoryId = entity.category?.id;
     this.categoryName = entity.category?.name;

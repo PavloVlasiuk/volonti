@@ -51,6 +51,8 @@ export interface Initiative {
     name: string
     status: OrgStatus
     email: string
+    avgRating: number | null
+    reviewCount: number
   }
   categoryId: string
   categoryName: string
@@ -58,4 +60,4 @@ export interface Initiative {
   updatedAt: string
 }
 
-export type FeedItem = Initiative & { matchScore: number }
+export type FeedItem = Initiative & { matchScore: number; reasons: string[] }

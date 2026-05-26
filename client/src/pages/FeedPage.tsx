@@ -1,13 +1,17 @@
-import { useState, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import InitiativeCard from '../components/InitiativeCard'
+import Pagination from '../components/Pagination'
 import Spinner from '../components/Spinner'
 import { getFeed } from '../api/profile.api'
 import { getCategories } from '../api/categories.api'
 import type { FormatType, InitiativeType } from '../types/initiative.types'
+
+const PAGE_SIZE = 12
+
+const FILTER_KEYS = ['city', 'format', 'type', 'categoryId'] as const
 
 const FORMAT_OPTIONS: { label: string; value: FormatType | '' }[] = [
   { label: 'Усі', value: '' },
@@ -46,14 +50,52 @@ function TogglePill({
 }
 
 export default function FeedPage() {
-  const [city, setCity] = useState('')
-  const [format, setFormat] = useState<FormatType | ''>('')
-  const [type, setType] = useState<InitiativeType | ''>('')
-  const [categoryId, setCategoryId] = useState('')
+  const [params, setParams] = useSearchParams()
 
-  const { data: feedItems = [], isLoading } = useQuery({
-    queryKey: ['feed'],
-    queryFn: getFeed,
+  const city = params.get('city') ?? ''
+  const format = (params.get('format') ?? '') as FormatType | ''
+  const type = (params.get('type') ?? '') as InitiativeType | ''
+  const categoryId = params.get('categoryId') ?? ''
+  const page = Math.max(1, Number(params.get('page') ?? '1') || 1)
+
+  function setFilter(key: string, value: string) {
+    setParams(prev => {
+      const next = new URLSearchParams(prev)
+      if (value) next.set(key, value)
+      else next.delete(key)
+      next.delete('page')
+      return next
+    })
+  }
+
+  function setPage(p: number) {
+    setParams(prev => {
+      const next = new URLSearchParams(prev)
+      if (p <= 1) next.delete('page')
+      else next.set('page', String(p))
+      return next
+    })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function resetFilters() {
+    setParams({})
+  }
+
+  const hasActiveFilters = FILTER_KEYS.some(k => params.get(k))
+
+  const query = {
+    ...(city && { city }),
+    ...(format && { format }),
+    ...(type && { type }),
+    ...(categoryId && { category: categoryId }),
+    page,
+    limit: PAGE_SIZE,
+  }
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['feed', query],
+    queryFn: () => getFeed(query),
   })
 
   const { data: categories = [] } = useQuery({
@@ -61,26 +103,14 @@ export default function FeedPage() {
     queryFn: getCategories,
   })
 
-  const hasNoInterests = feedItems.length > 0 && feedItems.every(f => f.matchScore === 0)
+  const feedItems = data?.items ?? []
+  const total = data?.total ?? 0
 
-  const filtered = useMemo(() => {
-    return feedItems.filter((item) => {
-      if (city && !item.city?.toLowerCase().includes(city.toLowerCase())) return false
-      if (format && item.format !== format) return false
-      if (type && item.type !== type) return false
-      if (categoryId && item.categoryId !== categoryId) return false
-      return true
-    })
-  }, [feedItems, city, format, type, categoryId])
-
-  const hasActiveFilters = !!(city || format || type || categoryId)
-
-  function resetFilters() {
-    setCity('')
-    setFormat('')
-    setType('')
-    setCategoryId('')
-  }
+  const hasNoInterests =
+    !hasActiveFilters &&
+    page === 1 &&
+    feedItems.length > 0 &&
+    feedItems.every(f => f.matchScore === 0)
 
   return (
     <div className="min-h-screen bg-bg text-white flex flex-col">
@@ -93,7 +123,12 @@ export default function FeedPage() {
             <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-accent">
               Стрічка
             </p>
-            <h1 className="text-3xl font-bold text-white sm:text-4xl">Ваша стрічка</h1>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h1 className="text-3xl font-bold text-white sm:text-4xl">Ваша стрічка</h1>
+              {!isLoading && (
+                <span className="text-sm text-muted">{total} результатів</span>
+              )}
+            </div>
             <p className="mt-2 text-sm text-muted">Підібрано за вашим профілем та інтересами</p>
           </div>
 
@@ -119,7 +154,7 @@ export default function FeedPage() {
                 type="text"
                 placeholder="Місто..."
                 value={city}
-                onChange={e => setCity(e.target.value)}
+                onChange={e => setFilter('city', e.target.value)}
                 className="rounded-lg bg-bg border border-white/10 px-3 py-1.5 text-sm text-white placeholder:text-muted focus:outline-none focus:border-accent/50 w-36"
               />
 
@@ -130,7 +165,7 @@ export default function FeedPage() {
                     <TogglePill
                       key={opt.value}
                       active={format === opt.value}
-                      onClick={() => setFormat(opt.value)}
+                      onClick={() => setFilter('format', opt.value)}
                     >
                       {opt.label}
                     </TogglePill>
@@ -145,7 +180,7 @@ export default function FeedPage() {
                     <TogglePill
                       key={opt.value}
                       active={type === opt.value}
-                      onClick={() => setType(opt.value)}
+                      onClick={() => setFilter('type', opt.value)}
                     >
                       {opt.label}
                     </TogglePill>
@@ -156,7 +191,7 @@ export default function FeedPage() {
               {categories.length > 0 && (
                 <select
                   value={categoryId}
-                  onChange={e => setCategoryId(e.target.value)}
+                  onChange={e => setFilter('categoryId', e.target.value)}
                   className="rounded-lg bg-bg border border-white/10 px-3 py-1.5 text-sm text-white focus:outline-none focus:border-accent/50"
                 >
                   <option value="">Категорія</option>
@@ -182,7 +217,7 @@ export default function FeedPage() {
             <div className="flex justify-center py-20">
               <Spinner />
             </div>
-          ) : filtered.length === 0 ? (
+          ) : feedItems.length === 0 ? (
             <div className="flex flex-col items-center py-24 gap-4 text-center">
               <p className="text-lg font-semibold text-white">Ініціативи не знайдено</p>
               <p className="text-sm text-muted max-w-xs">
@@ -200,15 +235,25 @@ export default function FeedPage() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {filtered.map((item) => (
-                <InitiativeCard
-                  key={item.id}
-                  initiative={item}
-                  matchScore={item.matchScore}
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {feedItems.map((item) => (
+                  <InitiativeCard
+                    key={item.id}
+                    initiative={item}
+                    matchScore={item.matchScore}
+                    reasons={item.reasons}
+                    dismissible
+                  />
+                ))}
+              </div>
+              <Pagination
+                page={page}
+                total={total}
+                limit={PAGE_SIZE}
+                onChange={setPage}
+              />
+            </>
           )}
         </div>
       </main>

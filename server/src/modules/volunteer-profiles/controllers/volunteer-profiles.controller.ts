@@ -1,4 +1,12 @@
-import { Body, Controller, forwardRef, Get, Inject, Put } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  forwardRef,
+  Get,
+  Inject,
+  Put,
+  Query,
+} from '@nestjs/common';
 import { RolesAuth } from '../../../common/decorators/roles-auth.decorator';
 import { GetUser } from '../../../common/decorators/get-user.decorator';
 import { UserRole } from '../../../common/enums';
@@ -7,6 +15,9 @@ import { UpdateVolunteerProfileDto } from '../dtos/update-volunteer-profile.dto'
 import { VolunteerProfileDto } from '../dtos/volunteer-profile.dto';
 import { AchievementsDto } from '../dtos/achievements.dto';
 import { InitiativesService } from '../../initiatives/services/initiatives.service';
+import { FeedQueryDto } from '../../initiatives/dtos/feed-query.dto';
+import { FeedItemDto } from '../../initiatives/dtos/feed-item.dto';
+import { PaginatedDto } from '../../../common/dtos/paginated.dto';
 
 @Controller('volunteer')
 @RolesAuth(UserRole.VOLUNTEER)
@@ -33,8 +44,9 @@ export class VolunteerProfilesController {
   @Get('feed')
   getFeed(
     @GetUser('id') userId: string,
-  ): Promise<Array<{ matchScore: number } & Record<string, any>>> {
-    return this.initiativesService.getFeed(userId);
+    @Query() query: FeedQueryDto,
+  ): Promise<PaginatedDto<FeedItemDto>> {
+    return this.initiativesService.getFeed(userId, query);
   }
 
   @Get('achievements')

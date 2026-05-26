@@ -3,11 +3,15 @@ import { useQuery } from '@tanstack/react-query'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import InitiativeCard from '../components/InitiativeCard'
+import Pagination from '../components/Pagination'
 import Spinner from '../components/Spinner'
 import { getInitiatives } from '../api/initiatives.api'
 import { getCategories } from '../api/categories.api'
-import { useAuth } from '../context/AuthContext'
 import type { FormatType, InitiativeType } from '../types/initiative.types'
+
+const PAGE_SIZE = 12
+
+const FILTER_KEYS = ['city', 'format', 'type', 'categoryId'] as const
 
 const FORMAT_OPTIONS: { label: string; value: FormatType | '' }[] = [
   { label: 'Усі', value: '' },
@@ -46,28 +50,39 @@ function TogglePill({
 }
 
 export default function BrowsePage() {
-  const { isVolunteer } = useAuth()
   const [params, setParams] = useSearchParams()
 
   const city = params.get('city') ?? ''
   const format = (params.get('format') ?? '') as FormatType | ''
   const type = (params.get('type') ?? '') as InitiativeType | ''
   const categoryId = params.get('categoryId') ?? ''
+  const page = Math.max(1, Number(params.get('page') ?? '1') || 1)
 
-  function setParam(key: string, value: string) {
+  function setFilter(key: string, value: string) {
     setParams(prev => {
       const next = new URLSearchParams(prev)
       if (value) next.set(key, value)
       else next.delete(key)
+      next.delete('page')
       return next
     })
+  }
+
+  function setPage(p: number) {
+    setParams(prev => {
+      const next = new URLSearchParams(prev)
+      if (p <= 1) next.delete('page')
+      else next.set('page', String(p))
+      return next
+    })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   function resetFilters() {
     setParams({})
   }
 
-  const hasActiveFilters = !!(city || format || type || categoryId)
+  const hasActiveFilters = FILTER_KEYS.some(k => params.get(k))
 
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
@@ -78,14 +93,17 @@ export default function BrowsePage() {
     ...(city && { city }),
     ...(format && { format }),
     ...(type && { type }),
-    ...(categoryId && { categoryId }),
-    status: 'ACTIVE' as const,
+    ...(categoryId && { category: categoryId }),
+    page,
+    limit: PAGE_SIZE,
   }
 
-  const { data: initiatives = [], isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['initiatives', filters],
     queryFn: () => getInitiatives(filters),
   })
+  const initiatives = data?.items ?? []
+  const total = data?.total ?? 0
 
   return (
     <div className="min-h-screen bg-bg text-white flex flex-col">
@@ -101,7 +119,7 @@ export default function BrowsePage() {
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h1 className="text-3xl font-bold text-white sm:text-4xl">Актуальні ініціативи</h1>
               {!isLoading && (
-                <span className="text-sm text-muted">{initiatives.length} результатів</span>
+                <span className="text-sm text-muted">{total} результатів</span>
               )}
             </div>
             <p className="mt-2 text-sm text-muted">
@@ -117,7 +135,7 @@ export default function BrowsePage() {
                 type="text"
                 placeholder="Місто..."
                 value={city}
-                onChange={e => setParam('city', e.target.value)}
+                onChange={e => setFilter('city', e.target.value)}
                 className="rounded-lg bg-bg border border-white/10 px-3 py-1.5 text-sm text-white placeholder:text-muted focus:outline-none focus:border-accent/50 w-36"
               />
 
@@ -129,7 +147,7 @@ export default function BrowsePage() {
                     <TogglePill
                       key={opt.value}
                       active={format === opt.value}
-                      onClick={() => setParam('format', opt.value)}
+                      onClick={() => setFilter('format', opt.value)}
                     >
                       {opt.label}
                     </TogglePill>
@@ -145,7 +163,7 @@ export default function BrowsePage() {
                     <TogglePill
                       key={opt.value}
                       active={type === opt.value}
-                      onClick={() => setParam('type', opt.value)}
+                      onClick={() => setFilter('type', opt.value)}
                     >
                       {opt.label}
                     </TogglePill>
@@ -157,7 +175,7 @@ export default function BrowsePage() {
               {categories.length > 0 && (
                 <select
                   value={categoryId}
-                  onChange={e => setParam('categoryId', e.target.value)}
+                  onChange={e => setFilter('categoryId', e.target.value)}
                   className="rounded-lg bg-bg border border-white/10 px-3 py-1.5 text-sm text-white focus:outline-none focus:border-accent/50"
                 >
                   <option value="">Категорія</option>
@@ -200,15 +218,22 @@ export default function BrowsePage() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {initiatives.map(initiative => (
-                <InitiativeCard
-                  key={initiative.id}
-                  initiative={initiative}
-                  matchScore={isVolunteer ? undefined : undefined}
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {initiatives.map(initiative => (
+                  <InitiativeCard
+                    key={initiative.id}
+                    initiative={initiative}
+                  />
+                ))}
+              </div>
+              <Pagination
+                page={page}
+                total={total}
+                limit={PAGE_SIZE}
+                onChange={setPage}
+              />
+            </>
           )}
         </div>
       </main>

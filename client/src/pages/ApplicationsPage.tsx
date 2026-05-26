@@ -1,10 +1,17 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { AxiosError } from 'axios'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import Badge from '../components/Badge'
 import Spinner from '../components/Spinner'
+import ReviewForm from '../components/ReviewForm'
 import { getMyApplications, downloadCertificate } from '../api/applications.api'
+import {
+  createReviewFromVolunteer,
+  getOwnReviewFromVolunteer,
+} from '../api/reviews.api'
 import { formatDate } from '../utils/formatDate'
 import type { Application, ApplicationStatus } from '../types/application.types'
 
@@ -20,11 +27,21 @@ const STATUS_LABEL: Record<ApplicationStatus, string> = {
   REJECTED: 'Відхилено',
 }
 
-function ApplicationRow({ app }: { app: Application }) {
-  const isCompleted = app.initiative
-    ? Boolean(app.completedAt)
-    : false
+function ApplicationRow({
+  app,
+  onLeaveReview,
+}: {
+  app: Application
+  onLeaveReview: (app: Application) => void
+}) {
+  const isCompleted = Boolean(app.completedAt)
   const showCertificate = isCompleted && app.participated === true
+
+  const { data: ownReview } = useQuery({
+    queryKey: ['ownReview', app.initiative.id],
+    queryFn: () => getOwnReviewFromVolunteer(app.initiative.id),
+    enabled: showCertificate,
+  })
 
   return (
     <div className="rounded-xl bg-surface border border-white/[0.06] px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -33,7 +50,14 @@ function ApplicationRow({ app }: { app: Application }) {
           {app.initiative.title}
         </p>
         <p className="mt-0.5 text-sm text-muted">
-          {app.initiative.organization.name} · {formatDate(app.createdAt)}
+          <Link
+            to={`/organizations/${app.initiative.organization.id}`}
+            className="hover:text-accent transition-colors"
+          >
+            {app.initiative.organization.name}
+          </Link>
+          {' · '}
+          {formatDate(app.createdAt)}
         </p>
         {showCertificate && (
           <p className="mt-1 text-xs text-accent">
@@ -42,10 +66,23 @@ function ApplicationRow({ app }: { app: Application }) {
         )}
       </div>
 
-      <div className="flex items-center gap-3 shrink-0">
+      <div className="flex items-center gap-3 shrink-0 flex-wrap">
         <Badge variant={STATUS_BADGE[app.status]}>
           {STATUS_LABEL[app.status]}
         </Badge>
+        {showCertificate && !ownReview && (
+          <button
+            onClick={() => onLeaveReview(app)}
+            className="text-sm font-medium text-accent hover:underline whitespace-nowrap"
+          >
+            Залишити відгук
+          </button>
+        )}
+        {showCertificate && ownReview && (
+          <span className="text-xs text-muted whitespace-nowrap">
+            Відгук залишено · ★ {ownReview.rating}
+          </span>
+        )}
         {showCertificate && (
           <button
             onClick={() => downloadCertificate(app.id)}
@@ -65,7 +102,61 @@ function ApplicationRow({ app }: { app: Application }) {
   )
 }
 
+function ReviewModal({
+  app,
+  onClose,
+}: {
+  app: Application
+  onClose: () => void
+}) {
+  const queryClient = useQueryClient()
+  const [error, setError] = useState<string | null>(null)
+
+  const mutation = useMutation({
+    mutationFn: (payload: { rating: number; comment?: string }) =>
+      createReviewFromVolunteer(app.initiative.id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ownReview', app.initiative.id] })
+      queryClient.invalidateQueries({ queryKey: ['applications'] })
+      onClose()
+    },
+    onError: (err: AxiosError<{ message?: string }>) => {
+      if (err.response?.status === 409) {
+        setError('Ви вже залишили відгук про цю ініціативу')
+      } else {
+        setError(err.response?.data?.message ?? 'Не вдалося надіслати відгук')
+      }
+    },
+  })
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-xl bg-surface border border-white/[0.08] p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-xs text-muted mb-1">Відгук про</p>
+        <p className="text-base font-semibold text-white mb-4">
+          {app.initiative.organization.name}
+        </p>
+        <ReviewForm
+          title={`«${app.initiative.title}»`}
+          onSubmit={(payload) => mutation.mutate(payload)}
+          onCancel={onClose}
+          submitting={mutation.isPending}
+          error={error}
+        />
+      </div>
+    </div>
+  )
+}
+
 export default function ApplicationsPage() {
+  const [reviewing, setReviewing] = useState<Application | null>(null)
+
   const { data: applications = [], isLoading } = useQuery({
     queryKey: ['applications'],
     queryFn: getMyApplications,
@@ -99,12 +190,20 @@ export default function ApplicationsPage() {
           ) : (
             <div className="flex flex-col gap-3">
               {applications.map(app => (
-                <ApplicationRow key={app.id} app={app} />
+                <ApplicationRow
+                  key={app.id}
+                  app={app}
+                  onLeaveReview={setReviewing}
+                />
               ))}
             </div>
           )}
         </div>
       </main>
+
+      {reviewing && (
+        <ReviewModal app={reviewing} onClose={() => setReviewing(null)} />
+      )}
 
       <Footer />
     </div>

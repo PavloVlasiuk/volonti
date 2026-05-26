@@ -1,4 +1,13 @@
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
 import { FormatType, InitiativeType } from '../../../common/enums';
 
 export class FilterInitiativesDto {
@@ -21,4 +30,17 @@ export class FilterInitiativesDto {
   @IsUUID()
   @IsOptional()
   organizationId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 12;
 }

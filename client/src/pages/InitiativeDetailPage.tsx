@@ -121,9 +121,22 @@ function Sidebar({
   return (
     <div className="rounded-xl bg-surface border border-white/[0.06] p-6 flex flex-col gap-4">
       <div>
-        <div className="flex items-center gap-2 mb-1">
-          <span className="font-semibold text-white">{initiative.organization.name}</span>
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
+          <Link
+            to={`/organizations/${initiative.organization.id}`}
+            className="font-semibold text-white hover:text-accent transition-colors"
+          >
+            {initiative.organization.name}
+          </Link>
           <Badge variant="category">НДО</Badge>
+          {initiative.organization.avgRating !== null && (
+            <span className="text-xs text-accent font-medium">
+              ★ {initiative.organization.avgRating.toFixed(1)}
+              <span className="text-muted ml-1">
+                · {initiative.organization.reviewCount} відгуків
+              </span>
+            </span>
+          )}
         </div>
         {isVerified && (
           <p className="text-xs font-medium text-accent">✓ Верифікована організація</p>
@@ -172,9 +185,14 @@ export default function InitiativeDetailPage() {
 
   const { data: otherInitiatives = [] } = useQuery({
     queryKey: ['initiatives', { organizationId: initiative?.organization.id }],
-    queryFn: () => getInitiatives({ organizationId: initiative!.organization.id }),
+    queryFn: () =>
+      getInitiatives({
+        organizationId: initiative!.organization.id,
+        page: 1,
+        limit: 6,
+      }),
     enabled: !!initiative,
-    select: data => data.filter(i => i.id !== id).slice(0, 3),
+    select: data => data.items.filter(i => i.id !== id).slice(0, 3),
   })
 
   function handleApplied() {

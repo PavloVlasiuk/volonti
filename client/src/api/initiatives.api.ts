@@ -2,6 +2,7 @@ import client from './client'
 import type { Initiative } from '../types/initiative.types'
 import type { Application } from '../types/application.types'
 import type { FormatType, InitiativeType } from '../types/initiative.types'
+import type { Paginated } from '../types/pagination.types'
 
 export interface InitiativeFilters {
   category?: string
@@ -9,9 +10,13 @@ export interface InitiativeFilters {
   format?: FormatType
   type?: InitiativeType
   organizationId?: string
+  page?: number
+  limit?: number
 }
 
-export async function getInitiatives(filters?: InitiativeFilters): Promise<Initiative[]> {
+export async function getInitiatives(
+  filters?: InitiativeFilters,
+): Promise<Paginated<Initiative>> {
   const res = await client.get('/initiatives', { params: filters })
   return res.data
 }
@@ -62,4 +67,8 @@ export async function completeInitiative(
 ): Promise<Initiative> {
   const res = await client.post(`/initiatives/${id}/complete`, dto)
   return res.data
+}
+
+export async function dismissInitiative(id: string): Promise<void> {
+  await client.post(`/initiatives/${id}/dismiss`)
 }
