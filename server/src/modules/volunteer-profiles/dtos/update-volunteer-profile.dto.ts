@@ -6,7 +6,9 @@ import {
   IsString,
   IsUUID,
   Length,
+  Matches,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 import { FormatPreference } from '../../../common/enums';
@@ -39,6 +41,22 @@ export class UpdateVolunteerProfileDto {
   @IsString()
   @IsOptional()
   bio?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(32)
+  @Matches(/^\+?[0-9\s\-()]*$/)
+  phone?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  telegram?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(200)
+  messenger?: string;
 
   @IsUUID('4', { each: true })
   @IsArray()

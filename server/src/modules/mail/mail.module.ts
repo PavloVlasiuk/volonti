@@ -25,7 +25,9 @@ import { MailService } from './services/mail.service';
         },
         template: {
           dir: join(process.cwd(), 'mail', 'templates'),
-          adapter: new HandlebarsAdapter(),
+          adapter: new HandlebarsAdapter({
+            eq: (a: unknown, b: unknown) => a === b,
+          }),
           options: { strict: true },
         },
       }),

@@ -131,7 +131,15 @@ export default function DashboardPage() {
   })
 
   const isPending = org?.status === 'PENDING'
+  const isRejected = org?.status === 'REJECTED'
+  const canPublish = org?.status === 'VERIFIED'
   const isLoading = orgLoading || initLoading
+
+  const blockedTitle = isPending
+    ? 'Акаунт не верифіковано'
+    : isRejected
+    ? 'Реєстрацію відхилено'
+    : undefined
 
   return (
     <div className="min-h-screen bg-bg text-white flex flex-col">
@@ -144,8 +152,8 @@ export default function DashboardPage() {
             <h1 className="text-3xl font-bold text-white">Мої ініціативи</h1>
             <Button
               onClick={() => navigate('/initiatives/new')}
-              disabled={isPending}
-              title={isPending ? 'Акаунт не верифіковано' : undefined}
+              disabled={!canPublish}
+              title={blockedTitle}
             >
               Нова ініціатива +
             </Button>
@@ -163,6 +171,24 @@ export default function DashboardPage() {
             </div>
           )}
 
+          {/* Rejected banner */}
+          {isRejected && (
+            <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-4">
+              <p className="text-sm text-red-300 font-medium">
+                Реєстрацію організації відхилено — публікація ініціатив недоступна
+              </p>
+              {org?.rejectionReason ? (
+                <p className="mt-1 text-xs text-red-300/80">
+                  Причина: {org.rejectionReason}
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-red-300/70">
+                  Зверніться до підтримки для з’ясування деталей.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Content */}
           {isLoading ? (
             <div className="flex justify-center py-20">
@@ -174,7 +200,7 @@ export default function DashboardPage() {
               <p className="text-sm text-muted max-w-xs">
                 Опублікуйте першу ініціативу, щоб залучити волонтерів до вашої діяльності.
               </p>
-              {!isPending && (
+              {canPublish && (
                 <Button className="mt-2" onClick={() => navigate('/initiatives/new')}>
                   Створити ініціативу
                 </Button>

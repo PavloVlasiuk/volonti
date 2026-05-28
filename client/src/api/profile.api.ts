@@ -16,6 +16,9 @@ export interface VolunteerProfile {
   age: number | null
   formatPreference: FormatPreference
   bio: string | null
+  phone: string | null
+  telegram: string | null
+  messenger: string | null
   updatedAt: string
   interests: { id: string; name: string }[]
 }
@@ -26,6 +29,9 @@ export interface UpdateProfileDto {
   city?: string
   age?: number
   formatPreference?: FormatPreference
+  phone?: string
+  telegram?: string
+  messenger?: string
   categoryIds?: string[]
 }
 
@@ -55,5 +61,17 @@ export async function getFeed(query?: FeedQuery): Promise<Paginated<FeedItem>> {
 
 export async function getAchievements(): Promise<AchievementsSummary> {
   const res = await client.get('/volunteer/achievements')
+  return res.data
+}
+
+export interface InitiativeMatch {
+  matchScore: number
+  reasons: string[]
+}
+
+export async function getInitiativeMatch(
+  initiativeId: string,
+): Promise<InitiativeMatch> {
+  const res = await client.get(`/volunteer/initiatives/${initiativeId}/match`)
   return res.data
 }

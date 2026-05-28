@@ -123,6 +123,24 @@ export class ReviewsService {
     return this.reviewsRepository.findFor(ReviewParty.ORGANIZATION, orgId);
   }
 
+  async getVolunteerReviewsByUserId(userId: string): Promise<{
+    avgRating: number | null;
+    reviewCount: number;
+    reviews: ReviewDto[];
+  }> {
+    const profile = await this.volunteerProfilesService.findByUserId(userId);
+    if (!profile) return { avgRating: null, reviewCount: 0, reviews: [] };
+    const [reviews, aggregate] = await Promise.all([
+      this.reviewsRepository.findFor(ReviewParty.VOLUNTEER, profile.id),
+      this.reviewsRepository.aggregateFor(ReviewParty.VOLUNTEER, profile.id),
+    ]);
+    return {
+      avgRating: aggregate.avg,
+      reviewCount: aggregate.count,
+      reviews,
+    };
+  }
+
   async getOwnReviewFromVolunteer(
     initiativeId: string,
     userId: string,

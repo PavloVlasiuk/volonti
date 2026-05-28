@@ -14,10 +14,7 @@ const userLoginSchema = z.object({
 })
 
 const orgLoginSchema = z.object({
-  edrpou: z
-    .string()
-    .length(8, 'ЄДРПОУ має містити 8 цифр')
-    .regex(/^\d{8}$/, 'Тільки цифри'),
+  email: z.string().email('Невірний формат email'),
   password: z.string().min(1, 'Введіть пароль'),
 })
 
@@ -75,7 +72,7 @@ export default function LoginPage() {
       const res = await loginOrganization(data)
       setPendingToken(res.pendingToken)
     } catch {
-      setServerError('Невірний ЄДРПОУ або пароль')
+      setServerError('Невірний email або пароль')
     }
   }
 
@@ -121,7 +118,7 @@ export default function LoginPage() {
                       : 'text-muted hover:text-white'
                   }`}
                 >
-                  Волонтер
+                  Особистий вхід
                 </button>
                 <button
                   type="button"
@@ -168,13 +165,11 @@ export default function LoginPage() {
               ) : (
                 <form onSubmit={orgForm.handleSubmit(handleOrgLogin)} className="flex flex-col gap-4">
                   <Input
-                    label="ЄДРПОУ"
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="12345678"
-                    maxLength={8}
-                    error={orgForm.formState.errors.edrpou?.message}
-                    {...orgForm.register('edrpou')}
+                    label="Email організації"
+                    type="email"
+                    placeholder="org@example.com"
+                    error={orgForm.formState.errors.email?.message}
+                    {...orgForm.register('email')}
                   />
                   <Input
                     label="Пароль"

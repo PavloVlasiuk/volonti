@@ -38,7 +38,7 @@ export async function login(
 }
 
 export async function loginOrganization(
-  data: { edrpou: string; password: string }
+  data: { email: string; password: string }
 ): Promise<OtpRequiredResponse> {
   const res = await client.post('/auth/login/organization', data)
   return res.data
@@ -49,11 +49,6 @@ export async function verifyOtp(data: {
   code: string
 }): Promise<TokensResponse> {
   const res = await client.post('/auth/verify-otp', data)
-  return res.data
-}
-
-export async function refresh(refreshToken: string): Promise<{ accessToken: string }> {
-  const res = await client.post('/auth/refresh', { refreshToken })
   return res.data
 }
 

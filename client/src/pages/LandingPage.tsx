@@ -36,10 +36,6 @@ function HeroSection() {
   return (
     <section className="pt-28 pb-20 px-4">
       <div className="mx-auto max-w-7xl">
-        <p className="mb-4 text-xs font-medium uppercase tracking-widest text-accent/80">
-          Платформа активна під час війни
-        </p>
-
         <h1 className="mb-6 text-4xl font-bold leading-tight text-white sm:text-5xl lg:text-6xl">
           Волонтерство, яке{' '}
           <em className="not-italic text-accent">справді</em> досягає мети
@@ -216,6 +212,32 @@ function FeaturedInitiatives() {
   )
 }
 
+function AboutSection() {
+  return (
+    <section id="about" className="py-20 px-4 border-t border-white/[0.04]">
+      <div className="mx-auto max-w-3xl text-center">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-accent">
+          Про платформу
+        </p>
+        <h2 className="mb-6 text-3xl font-bold text-white sm:text-4xl">
+          Бакалаврська дипломна робота
+        </h2>
+        <p className="mb-4 text-base leading-relaxed text-white/70">
+          VolonTi — це бакалаврська дипломна робота, присвячена побудові
+          платформи для пошуку волонтерів та координації ініціатив громадських
+          організацій.
+        </p>
+        <p className="text-sm leading-relaxed text-muted">
+          Проєкт реалізовано як full-stack застосунок на NestJS, PostgreSQL та
+          React. Алгоритм підбору ініціатив враховує інтереси, місто, формат
+          участі та терміновість, формуючи персоналізовану стрічку для кожного
+          волонтера.
+        </p>
+      </div>
+    </section>
+  )
+}
+
 function CtaBanner() {
   return (
     <section className="py-16 px-4 bg-accent">
@@ -253,6 +275,7 @@ export default function LandingPage() {
         <HowItWorks />
         <CategoriesSection />
         <FeaturedInitiatives />
+        <AboutSection />
         <CtaBanner />
       </main>
       <Footer />

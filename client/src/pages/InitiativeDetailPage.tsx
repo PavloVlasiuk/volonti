@@ -9,6 +9,8 @@ import InitiativeCard from '../components/InitiativeCard'
 import MatchScoreBar from '../components/MatchScoreBar'
 import ApplicationFormModal from '../components/ApplicationFormModal'
 import { getInitiative, getInitiatives } from '../api/initiatives.api'
+import { getInitiativeMatch } from '../api/profile.api'
+import { getOwnApplicationForInitiative } from '../api/applications.api'
 import { useAuth } from '../context/AuthContext'
 import { formatDate } from '../utils/formatDate'
 import type { Initiative } from '../types/initiative.types'
@@ -46,17 +48,20 @@ function MetaRow({ initiative }: { initiative: Initiative }) {
 function ApplyButton({
   initiative,
   hasApplied,
+  applicationStatus,
   onApply,
 }: {
   initiative: Initiative
   hasApplied: boolean
+  applicationStatus: 'PENDING' | 'ACCEPTED' | 'REJECTED' | null
   onApply: () => void
 }) {
   const { isAuthenticated, isVolunteer } = useAuth()
   const navigate = useNavigate()
-  const isClosed = initiative.status === 'CLOSED'
+  const isInactive =
+    initiative.status === 'CLOSED' || initiative.status === 'COMPLETED'
 
-  if (isClosed) {
+  if (isInactive) {
     return (
       <button
         disabled
@@ -83,12 +88,18 @@ function ApplyButton({
   }
 
   if (hasApplied) {
+    const label =
+      applicationStatus === 'ACCEPTED'
+        ? 'Заявку прийнято ✓'
+        : applicationStatus === 'REJECTED'
+          ? 'Заявку відхилено'
+          : 'Заявку подано ✓'
     return (
       <button
         disabled
         className="w-full rounded-xl bg-accent/20 py-3 text-sm font-semibold text-accent cursor-not-allowed"
       >
-        Заявку подано ✓
+        {label}
       </button>
     )
   }
@@ -106,10 +117,12 @@ function ApplyButton({
 function Sidebar({
   initiative,
   hasApplied,
+  applicationStatus,
   onApply,
 }: {
   initiative: Initiative
   hasApplied: boolean
+  applicationStatus: 'PENDING' | 'ACCEPTED' | 'REJECTED' | null
   onApply: () => void
 }) {
   const isVerified = initiative.organization.status === 'VERIFIED'
@@ -149,6 +162,7 @@ function Sidebar({
         <ApplyButton
           initiative={initiative}
           hasApplied={hasApplied}
+          applicationStatus={applicationStatus}
           onApply={onApply}
         />
         <p className="text-center text-xs text-muted">
@@ -173,7 +187,6 @@ function Sidebar({
 export default function InitiativeDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { isVolunteer } = useAuth()
-  const [hasApplied, setHasApplied] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [alreadyAppliedBanner, setAlreadyAppliedBanner] = useState(false)
 
@@ -181,6 +194,18 @@ export default function InitiativeDetailPage() {
     queryKey: ['initiative', id],
     queryFn: () => getInitiative(id!),
     enabled: !!id,
+  })
+
+  const { data: ownApplication } = useQuery({
+    queryKey: ['ownApplication', id],
+    queryFn: () => getOwnApplicationForInitiative(id!),
+    enabled: !!id && isVolunteer,
+  })
+
+  const { data: match } = useQuery({
+    queryKey: ['match', id],
+    queryFn: () => getInitiativeMatch(id!),
+    enabled: !!id && isVolunteer,
   })
 
   const { data: otherInitiatives = [] } = useQuery({
@@ -195,13 +220,14 @@ export default function InitiativeDetailPage() {
     select: data => data.items.filter(i => i.id !== id).slice(0, 3),
   })
 
+  const hasApplied = !!ownApplication
+  const applicationStatus = ownApplication?.status ?? null
+
   function handleApplied() {
-    setHasApplied(true)
     setShowModal(false)
   }
 
   function handleAlreadyApplied() {
-    setHasApplied(true)
     setShowModal(false)
     setAlreadyAppliedBanner(true)
   }
@@ -292,9 +318,24 @@ export default function InitiativeDetailPage() {
                 </div>
               )}
 
-              {isVolunteer && (
+              {isVolunteer && match && (
                 <div className="mb-8">
-                  <MatchScoreBar score={0} label="Збіг з вашим профілем" />
+                  <MatchScoreBar
+                    score={match.matchScore}
+                    label="Збіг з вашим профілем"
+                  />
+                  {match.reasons.length > 0 && (
+                    <ul className="mt-3 flex flex-wrap gap-2">
+                      {match.reasons.map((r) => (
+                        <li
+                          key={r}
+                          className="rounded-full bg-accent/10 border border-accent/30 px-3 py-1 text-xs text-accent"
+                        >
+                          {r}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               )}
             </div>
@@ -305,6 +346,7 @@ export default function InitiativeDetailPage() {
                 <Sidebar
                   initiative={initiative}
                   hasApplied={hasApplied}
+                  applicationStatus={applicationStatus}
                   onApply={() => setShowModal(true)}
                 />
                 {alreadyAppliedBanner && (

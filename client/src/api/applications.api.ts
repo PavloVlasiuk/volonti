@@ -26,6 +26,13 @@ export async function getMyApplications(): Promise<Application[]> {
   return res.data
 }
 
+export async function getOwnApplicationForInitiative(
+  initiativeId: string,
+): Promise<Application | null> {
+  const res = await client.get(`/volunteer/initiatives/${initiativeId}/application`)
+  return res.data
+}
+
 export async function downloadCertificate(applicationId: string): Promise<void> {
   const res = await client.get(`/applications/${applicationId}/certificate.pdf`, {
     responseType: 'blob',

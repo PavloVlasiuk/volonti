@@ -30,6 +30,15 @@ export class VolunteerProfile extends BaseEntity {
   @Column({ name: 'bio', type: 'text', nullable: true })
   bio: string | null;
 
+  @Column({ name: 'phone', type: 'varchar', length: 32, nullable: true })
+  phone: string | null;
+
+  @Column({ name: 'telegram', type: 'varchar', length: 100, nullable: true })
+  telegram: string | null;
+
+  @Column({ name: 'messenger', type: 'varchar', length: 200, nullable: true })
+  messenger: string | null;
+
   @Column({ name: 'user_id', unique: true })
   userId: string;
 

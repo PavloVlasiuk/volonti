@@ -9,6 +9,9 @@ export class VolunteerProfileDto {
   age: number | null;
   formatPreference: FormatPreference;
   bio: string | null;
+  phone: string | null;
+  telegram: string | null;
+  messenger: string | null;
   updatedAt: Date;
   interests: Array<{ id: string; name: string }>;
 
@@ -20,6 +23,9 @@ export class VolunteerProfileDto {
     this.age = entity.age ?? null;
     this.formatPreference = entity.formatPreference;
     this.bio = entity.bio ?? null;
+    this.phone = entity.phone ?? null;
+    this.telegram = entity.telegram ?? null;
+    this.messenger = entity.messenger ?? null;
     this.updatedAt = entity.updatedAt;
     this.interests =
       entity.interests?.map((vi) => ({

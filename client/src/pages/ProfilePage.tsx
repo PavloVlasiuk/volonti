@@ -12,6 +12,7 @@ import { getProfile, updateProfile, getAchievements } from '../api/profile.api'
 import { enableTwoFa, disableTwoFa } from '../api/auth.api'
 import { getCategories } from '../api/categories.api'
 import { downloadCertificate } from '../api/applications.api'
+import { getMyVolunteerReviews } from '../api/reviews.api'
 import { formatDate } from '../utils/formatDate'
 
 const FORMAT_OPTIONS = [
@@ -25,6 +26,14 @@ const schema = z.object({
   lastName: z.string().min(1, 'Введіть прізвище'),
   city: z.string().optional(),
   age: z.coerce.number().int().min(14).max(120).optional().or(z.literal('')),
+  phone: z
+    .string()
+    .max(32)
+    .regex(/^\+?[0-9\s\-()]*$/, 'Невірний формат телефону')
+    .optional()
+    .or(z.literal('')),
+  telegram: z.string().max(100).optional().or(z.literal('')),
+  messenger: z.string().max(200).optional().or(z.literal('')),
 })
 
 type FormData = z.infer<typeof schema>
@@ -51,6 +60,11 @@ export default function ProfilePage() {
     queryFn: getAchievements,
   })
 
+  const { data: myReviews } = useQuery({
+    queryKey: ['myVolunteerReviews'],
+    queryFn: getMyVolunteerReviews,
+  })
+
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
   })
@@ -62,6 +76,9 @@ export default function ProfilePage() {
         lastName: profile.lastName,
         city: profile.city ?? '',
         age: profile.age ?? '',
+        phone: profile.phone ?? '',
+        telegram: profile.telegram ?? '',
+        messenger: profile.messenger ?? '',
       })
       setSelectedCategoryIds(profile.interests.map(i => i.id))
       setFormatPreference(profile.formatPreference ?? 'ANY')
@@ -95,6 +112,9 @@ export default function ProfilePage() {
       lastName: data.lastName,
       city: data.city || undefined,
       age: data.age ? Number(data.age) : undefined,
+      phone: data.phone || undefined,
+      telegram: data.telegram || undefined,
+      messenger: data.messenger || undefined,
       formatPreference,
       categoryIds: selectedCategoryIds,
     })
@@ -153,6 +173,34 @@ export default function ProfilePage() {
                   error={errors.age?.message}
                   {...register('age')}
                 />
+              </div>
+
+              {/* Contacts (optional) */}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-white">Контакти (необов'язково)</label>
+                <p className="text-xs text-muted">
+                  Організація побачить ваш email автоматично. Додайте інші канали для зв'язку.
+                </p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <Input
+                    label="Телефон"
+                    placeholder="+380..."
+                    error={errors.phone?.message}
+                    {...register('phone')}
+                  />
+                  <Input
+                    label="Telegram"
+                    placeholder="@username"
+                    error={errors.telegram?.message}
+                    {...register('telegram')}
+                  />
+                  <Input
+                    label="Інший месенджер"
+                    placeholder="Viber, Signal..."
+                    error={errors.messenger?.message}
+                    {...register('messenger')}
+                  />
+                </div>
               </div>
 
               {/* Format preference */}
@@ -277,6 +325,45 @@ export default function ProfilePage() {
                     >
                       Сертифікат ↓
                     </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Rating + reviews */}
+          {myReviews && myReviews.reviewCount > 0 && (
+            <div className="rounded-2xl bg-surface border border-white/[0.06] p-6 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-semibold text-white">Мій рейтинг</h2>
+                <p className="text-sm text-accent">
+                  ★ {myReviews.avgRating?.toFixed(1) ?? '—'}
+                  <span className="text-muted ml-1">
+                    · {myReviews.reviewCount} відгуків
+                  </span>
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                {myReviews.reviews.map((r) => (
+                  <div
+                    key={r.id}
+                    className="rounded-xl border border-white/[0.06] px-4 py-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-white line-clamp-1">
+                        {r.authorName || 'Організація'}
+                      </p>
+                      <p className="text-xs text-accent shrink-0">★ {r.rating}</p>
+                    </div>
+                    {r.comment && (
+                      <p className="mt-1 text-sm text-white/80 whitespace-pre-line">
+                        {r.comment}
+                      </p>
+                    )}
+                    <p className="mt-1 text-xs text-muted">
+                      {formatDate(r.createdAt)}
+                    </p>
                   </div>
                 ))}
               </div>

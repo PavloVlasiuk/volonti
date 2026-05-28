@@ -5,47 +5,110 @@ import Footer from '../components/Footer'
 import InitiativeCard from '../components/InitiativeCard'
 import Pagination from '../components/Pagination'
 import Spinner from '../components/Spinner'
-import { getFeed } from '../api/profile.api'
+import PersonalizationStrip from '../components/PersonalizationStrip'
+import FeedFiltersDrawer from '../components/FeedFiltersDrawer'
+import { getFeed, getProfile } from '../api/profile.api'
 import { getCategories } from '../api/categories.api'
-import type { FormatType, InitiativeType } from '../types/initiative.types'
+import type { FeedItem, FormatType, InitiativeType } from '../types/initiative.types'
 
 const PAGE_SIZE = 12
-
+const TOP_THRESHOLD = 70
+const MID_THRESHOLD = 40
 const FILTER_KEYS = ['city', 'format', 'type', 'categoryId'] as const
 
-const FORMAT_OPTIONS: { label: string; value: FormatType | '' }[] = [
-  { label: 'Усі', value: '' },
-  { label: 'Онлайн', value: 'REMOTE' },
-  { label: 'Офлайн', value: 'ON_SITE' },
-]
+interface SectionProps {
+  title: string
+  subtitle?: string
+  items: FeedItem[]
+  layout: 'hero' | 'feed' | 'rest'
+}
 
-const TYPE_OPTIONS: { label: string; value: InitiativeType | '' }[] = [
-  { label: 'Усі', value: '' },
-  { label: 'Термінові', value: 'URGENT' },
-  { label: 'Планові', value: 'PLANNED' },
-  { label: 'Постійні', value: 'ONGOING' },
-]
+function FeedSection({ title, subtitle, items, layout }: SectionProps) {
+  if (items.length === 0) return null
 
-function TogglePill({
-  active,
-  onClick,
-  children,
+  if (layout === 'hero') {
+    const [first, ...next] = items
+    return (
+      <section className="mb-10">
+        <SectionHeader title={title} subtitle={subtitle} />
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <InitiativeCard
+            initiative={first}
+            matchScore={first.matchScore}
+            reasons={first.reasons}
+            variant="hero"
+            dismissible
+          />
+          {next.length > 0 && (
+            <div className="flex flex-col gap-5">
+              {next.map((item) => (
+                <InitiativeCard
+                  key={item.id}
+                  initiative={item}
+                  matchScore={item.matchScore}
+                  reasons={item.reasons}
+                  variant="feed"
+                  dismissible
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+    )
+  }
+
+  if (layout === 'feed') {
+    return (
+      <section className="mb-10">
+        <SectionHeader title={title} subtitle={subtitle} />
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {items.map((item) => (
+            <InitiativeCard
+              key={item.id}
+              initiative={item}
+              matchScore={item.matchScore}
+              reasons={item.reasons}
+              variant="feed"
+              dismissible
+            />
+          ))}
+        </div>
+      </section>
+    )
+  }
+
+  return (
+    <section className="mb-10">
+      <SectionHeader title={title} subtitle={subtitle} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {items.map((item) => (
+          <InitiativeCard
+            key={item.id}
+            initiative={item}
+            matchScore={item.matchScore}
+            reasons={item.reasons}
+            compact
+            dismissible
+          />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function SectionHeader({
+  title,
+  subtitle,
 }: {
-  active: boolean
-  onClick: () => void
-  children: React.ReactNode
+  title: string
+  subtitle?: string
 }) {
   return (
-    <button
-      onClick={onClick}
-      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-        active
-          ? 'bg-accent text-bg'
-          : 'border border-white/10 text-muted hover:border-white/20 hover:text-white'
-      }`}
-    >
-      {children}
-    </button>
+    <div className="mb-5 flex items-baseline gap-3">
+      <h2 className="text-lg font-semibold text-white">{title}</h2>
+      {subtitle && <p className="text-xs text-muted">· {subtitle}</p>}
+    </div>
   )
 }
 
@@ -59,7 +122,7 @@ export default function FeedPage() {
   const page = Math.max(1, Number(params.get('page') ?? '1') || 1)
 
   function setFilter(key: string, value: string) {
-    setParams(prev => {
+    setParams((prev) => {
       const next = new URLSearchParams(prev)
       if (value) next.set(key, value)
       else next.delete(key)
@@ -69,7 +132,7 @@ export default function FeedPage() {
   }
 
   function setPage(p: number) {
-    setParams(prev => {
+    setParams((prev) => {
       const next = new URLSearchParams(prev)
       if (p <= 1) next.delete('page')
       else next.set('page', String(p))
@@ -82,7 +145,7 @@ export default function FeedPage() {
     setParams({})
   }
 
-  const hasActiveFilters = FILTER_KEYS.some(k => params.get(k))
+  const hasActiveFilters = FILTER_KEYS.some((k) => params.get(k))
 
   const query = {
     ...(city && { city }),
@@ -98,6 +161,11 @@ export default function FeedPage() {
     queryFn: () => getFeed(query),
   })
 
+  const { data: profile } = useQuery({
+    queryKey: ['profile'],
+    queryFn: getProfile,
+  })
+
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
     queryFn: getCategories,
@@ -106,11 +174,27 @@ export default function FeedPage() {
   const feedItems = data?.items ?? []
   const total = data?.total ?? 0
 
+  const hasPersonalization =
+    !!profile &&
+    ((profile.interests?.length ?? 0) > 0 ||
+      !!profile.city ||
+      (profile.formatPreference && profile.formatPreference !== 'ANY'))
+
   const hasNoInterests =
     !hasActiveFilters &&
     page === 1 &&
     feedItems.length > 0 &&
-    feedItems.every(f => f.matchScore === 0)
+    feedItems.every((f) => f.matchScore === 0)
+
+  const top = feedItems.filter((i) => i.matchScore >= TOP_THRESHOLD)
+  const mid = feedItems.filter(
+    (i) => i.matchScore >= MID_THRESHOLD && i.matchScore < TOP_THRESHOLD,
+  )
+  const rest = feedItems.filter((i) => i.matchScore < MID_THRESHOLD)
+
+  // Fallback: if scores don't differentiate items, render a flat grid so the
+  // page still looks intentional instead of dumping everything as "rest".
+  const useFallbackGrid = top.length === 0 && mid.length === 0
 
   return (
     <div className="min-h-screen bg-bg text-white flex flex-col">
@@ -118,21 +202,25 @@ export default function FeedPage() {
 
       <main className="flex-1 pt-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
-          {/* Header */}
-          <div className="mb-8">
+          <div className="mb-6">
             <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-accent">
               Стрічка
             </p>
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h1 className="text-3xl font-bold text-white sm:text-4xl">Ваша стрічка</h1>
+              <h1 className="text-3xl font-bold text-white sm:text-4xl">
+                Ваша стрічка
+              </h1>
               {!isLoading && (
                 <span className="text-sm text-muted">{total} результатів</span>
               )}
             </div>
-            <p className="mt-2 text-sm text-muted">Підібрано за вашим профілем та інтересами</p>
+            <p className="mt-2 text-sm text-muted">
+              Підібрано за вашим профілем та інтересами
+            </p>
           </div>
 
-          {/* Incomplete profile banner */}
+          {hasPersonalization && <PersonalizationStrip profile={profile} />}
+
           {hasNoInterests && (
             <div className="mb-6 rounded-xl bg-accent/10 border border-accent/20 px-5 py-4 flex items-center justify-between gap-4">
               <p className="text-sm text-white/80">
@@ -147,79 +235,26 @@ export default function FeedPage() {
             </div>
           )}
 
-          {/* Filter bar */}
-          <div className="mb-8 rounded-xl bg-surface border border-white/[0.06] p-4">
-            <div className="flex flex-wrap items-center gap-4">
-              <input
-                type="text"
-                placeholder="Місто..."
-                value={city}
-                onChange={e => setFilter('city', e.target.value)}
-                className="rounded-lg bg-bg border border-white/10 px-3 py-1.5 text-sm text-white placeholder:text-muted focus:outline-none focus:border-accent/50 w-36"
-              />
+          <FeedFiltersDrawer
+            city={city}
+            format={format}
+            type={type}
+            categoryId={categoryId}
+            categories={categories}
+            hasActiveFilters={hasActiveFilters}
+            onChange={setFilter}
+            onReset={resetFilters}
+          />
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted">Формат</span>
-                <div className="flex gap-1">
-                  {FORMAT_OPTIONS.map(opt => (
-                    <TogglePill
-                      key={opt.value}
-                      active={format === opt.value}
-                      onClick={() => setFilter('format', opt.value)}
-                    >
-                      {opt.label}
-                    </TogglePill>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted">Тип</span>
-                <div className="flex gap-1">
-                  {TYPE_OPTIONS.map(opt => (
-                    <TogglePill
-                      key={opt.value}
-                      active={type === opt.value}
-                      onClick={() => setFilter('type', opt.value)}
-                    >
-                      {opt.label}
-                    </TogglePill>
-                  ))}
-                </div>
-              </div>
-
-              {categories.length > 0 && (
-                <select
-                  value={categoryId}
-                  onChange={e => setFilter('categoryId', e.target.value)}
-                  className="rounded-lg bg-bg border border-white/10 px-3 py-1.5 text-sm text-white focus:outline-none focus:border-accent/50"
-                >
-                  <option value="">Категорія</option>
-                  {categories.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              )}
-
-              {hasActiveFilters && (
-                <button
-                  onClick={resetFilters}
-                  className="ml-auto text-xs font-medium text-accent hover:underline"
-                >
-                  Скинути фільтри
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Content */}
           {isLoading ? (
             <div className="flex justify-center py-20">
               <Spinner />
             </div>
           ) : feedItems.length === 0 ? (
             <div className="flex flex-col items-center py-24 gap-4 text-center">
-              <p className="text-lg font-semibold text-white">Ініціативи не знайдено</p>
+              <p className="text-lg font-semibold text-white">
+                Ініціативи не знайдено
+              </p>
               <p className="text-sm text-muted max-w-xs">
                 {hasActiveFilters
                   ? 'Спробуйте змінити або скинути фільтри.'
@@ -234,7 +269,7 @@ export default function FeedPage() {
                 </button>
               )}
             </div>
-          ) : (
+          ) : useFallbackGrid ? (
             <>
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {feedItems.map((item) => (
@@ -247,6 +282,33 @@ export default function FeedPage() {
                   />
                 ))}
               </div>
+              <Pagination
+                page={page}
+                total={total}
+                limit={PAGE_SIZE}
+                onChange={setPage}
+              />
+            </>
+          ) : (
+            <>
+              <FeedSection
+                title="Топ збігів"
+                subtitle="Найкраще пасує до вашого профілю"
+                items={top.slice(0, 5)}
+                layout="hero"
+              />
+              <FeedSection
+                title="Може зацікавити"
+                subtitle="Близькі до ваших інтересів"
+                items={mid}
+                layout="feed"
+              />
+              <FeedSection
+                title="Інші ідеї"
+                subtitle="Можливо, варто спробувати щось нове"
+                items={[...top.slice(5), ...rest]}
+                layout="rest"
+              />
               <Pagination
                 page={page}
                 total={total}

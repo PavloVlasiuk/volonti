@@ -76,6 +76,22 @@ export class ApplicationsRepository extends BaseRepositoryWrapper<
     return this.toDtosWithRatings(entities);
   }
 
+  async findOwnForInitiative(
+    initiativeId: string,
+    volunteerProfileId: string,
+  ): Promise<ApplicationDto | null> {
+    const entity = await this.findOne({
+      where: {
+        initiative: { id: initiativeId },
+        volunteerProfile: { id: volunteerProfileId },
+      },
+      relations: APPLICATION_RELATIONS,
+    });
+    if (!entity) return null;
+    const [dto] = await this.toDtosWithRatings([entity]);
+    return dto;
+  }
+
   async findByInitiative(initiativeId: string): Promise<ApplicationDto[]> {
     const entities = await this.find({
       where: { initiative: { id: initiativeId } },

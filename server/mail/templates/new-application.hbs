@@ -3,7 +3,16 @@
 <body>
   <p>Нова заявка на вашу ініціативу <strong>«{{initiativeTitle}}»</strong>.</p>
   <p>Волонтер: <strong>{{volunteerName}}</strong></p>
-  <p>Перегляньте заявки у вашому дашборді.</p>
+
+  <p>Контакти волонтера:</p>
+  <ul>
+    {{#if contacts.email}}<li>Email: <a href="mailto:{{contacts.email}}">{{contacts.email}}</a></li>{{/if}}
+    {{#if contacts.phone}}<li>Телефон: {{contacts.phone}}</li>{{/if}}
+    {{#if contacts.telegram}}<li>Telegram: {{contacts.telegram}}</li>{{/if}}
+    {{#if contacts.messenger}}<li>Інший месенджер: {{contacts.messenger}}</li>{{/if}}
+  </ul>
+
+  <p><a href="{{applicationsUrl}}">Переглянути заявки</a></p>
   <p>З повагою, команда VolonTi</p>
 </body>
 </html>

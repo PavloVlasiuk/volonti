@@ -49,10 +49,6 @@ export class OrganizationsService {
     return this.organizationsRepository.findRawByEmail(email);
   }
 
-  findRawByEdrpou(edrpou: string): Promise<Organization | null> {
-    return this.organizationsRepository.findRawByEdrpou(edrpou);
-  }
-
   async create(data: DeepPartial<Organization>): Promise<OrganizationDto> {
     return this.organizationsRepository.saveToDto(data);
   }

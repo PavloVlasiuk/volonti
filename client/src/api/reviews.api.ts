@@ -25,6 +25,17 @@ export async function getOrgReviews(orgId: string): Promise<Review[]> {
   return res.data
 }
 
+export interface MyVolunteerReviews {
+  avgRating: number | null
+  reviewCount: number
+  reviews: Review[]
+}
+
+export async function getMyVolunteerReviews(): Promise<MyVolunteerReviews> {
+  const res = await client.get('/volunteer/reviews')
+  return res.data
+}
+
 export async function getOwnReviewFromVolunteer(
   initiativeId: string
 ): Promise<Review | null> {

@@ -64,10 +64,20 @@ export class ApplicationsService {
       throw e;
     }
 
+    const volunteerRaw = await this.volunteerProfilesService.findRawById(
+      profile.id,
+    );
     void this.mailService.sendNewApplicationArrived(
       initiative.organization.email,
       `${profile.firstName} ${profile.lastName}`,
       initiative.title,
+      initiative.id,
+      {
+        email: volunteerRaw?.user?.email ?? '',
+        phone: dto.contactPhone ?? volunteerRaw?.phone ?? null,
+        telegram: volunteerRaw?.telegram ?? null,
+        messenger: volunteerRaw?.messenger ?? null,
+      },
     );
 
     return this.applicationsRepository.findById(savedId);
@@ -135,5 +145,17 @@ export class ApplicationsService {
     const profile = await this.volunteerProfilesService.findByUserId(userId);
     if (!profile) throw new NotFoundException('Volunteer profile not found');
     return this.applicationsRepository.findByVolunteerProfile(profile.id);
+  }
+
+  async findOwnForInitiative(
+    initiativeId: string,
+    userId: string,
+  ): Promise<ApplicationDto | null> {
+    const profile = await this.volunteerProfilesService.findByUserId(userId);
+    if (!profile) return null;
+    return this.applicationsRepository.findOwnForInitiative(
+      initiativeId,
+      profile.id,
+    );
   }
 }

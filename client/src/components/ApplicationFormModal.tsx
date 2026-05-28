@@ -94,12 +94,16 @@ export default function ApplicationFormModal({
     setValue('availability', next, { shouldDirty: true })
   }
 
+  const isInitiativeInactive =
+    initiative.status === 'CLOSED' || initiative.status === 'COMPLETED'
+
   const mutation = useMutation({
     mutationFn: (payload: SubmitApplicationPayload) =>
       submitApplication(initiative.id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['applications'] })
       queryClient.invalidateQueries({ queryKey: ['initiative', initiative.id] })
+      queryClient.invalidateQueries({ queryKey: ['ownApplication', initiative.id] })
       onSuccess()
     },
     onError: (err: { response?: { status?: number } }) => {
@@ -143,6 +147,12 @@ export default function ApplicationFormModal({
 
         <h2 className="text-xl font-bold text-white mb-1">Подати заявку</h2>
         <p className="text-sm text-muted mb-5 line-clamp-2">{initiative.title}</p>
+
+        {isInitiativeInactive && (
+          <p className="mb-4 rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-3 text-sm text-red-300">
+            Ініціативу завершено — подати заявку неможливо.
+          </p>
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <Textarea
@@ -225,6 +235,7 @@ export default function ApplicationFormModal({
               type="submit"
               variant="filled"
               loading={isSubmitting || mutation.isPending}
+              disabled={isInitiativeInactive}
               className="flex-1"
             >
               Надіслати

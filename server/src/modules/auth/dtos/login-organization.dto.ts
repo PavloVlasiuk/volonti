@@ -1,10 +1,8 @@
-import { IsString, Length, Matches } from 'class-validator';
+import { IsEmail, IsString } from 'class-validator';
 
 export class LoginOrganizationDto {
-  @IsString()
-  @Length(8, 8, { message: 'EDRPOU must be exactly 8 digits' })
-  @Matches(/^\d{8}$/, { message: 'EDRPOU must contain only digits' })
-  edrpou: string;
+  @IsEmail()
+  email: string;
 
   @IsString()
   password: string;

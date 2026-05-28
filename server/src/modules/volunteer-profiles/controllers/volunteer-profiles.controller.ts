@@ -4,6 +4,8 @@ import {
   forwardRef,
   Get,
   Inject,
+  Param,
+  ParseUUIDPipe,
   Put,
   Query,
 } from '@nestjs/common';
@@ -52,5 +54,13 @@ export class VolunteerProfilesController {
   @Get('achievements')
   getAchievements(@GetUser('id') userId: string): Promise<AchievementsDto> {
     return this.profilesService.getAchievements(userId);
+  }
+
+  @Get('initiatives/:id/match')
+  getMatch(
+    @GetUser('id') userId: string,
+    @Param('id', ParseUUIDPipe) initiativeId: string,
+  ): Promise<{ matchScore: number; reasons: string[] }> {
+    return this.initiativesService.getMatchForVolunteer(initiativeId, userId);
   }
 }

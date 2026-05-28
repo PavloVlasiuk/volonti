@@ -46,6 +46,16 @@ export class ReviewsController {
     return this.reviewsService.getOrganizationReviews(id);
   }
 
+  @Get('volunteer/reviews')
+  @RolesAuth(UserRole.VOLUNTEER)
+  getMyReviews(@GetUser('id') userId: string): Promise<{
+    avgRating: number | null;
+    reviewCount: number;
+    reviews: ReviewDto[];
+  }> {
+    return this.reviewsService.getVolunteerReviewsByUserId(userId);
+  }
+
   @Get('initiatives/:initiativeId/reviews/own')
   @RolesAuth(UserRole.VOLUNTEER)
   getOwnFromVolunteer(

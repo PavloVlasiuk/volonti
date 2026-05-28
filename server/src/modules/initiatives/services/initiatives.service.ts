@@ -290,6 +290,26 @@ export class InitiativesService {
     return this.attachVolunteerRatings(apps);
   }
 
+  async getMatchForVolunteer(
+    initiativeId: string,
+    userId: string,
+  ): Promise<{ matchScore: number; reasons: string[] }> {
+    const initiative =
+      await this.initiativesRepository.findByIdWithRelations(initiativeId);
+    if (!initiative) throw new NotFoundException('Initiative not found');
+
+    const profile = await this.volunteerProfilesService.findByUserId(userId);
+    if (!profile) return { matchScore: 0, reasons: [] };
+
+    const affinity = await this.loadAppliedAffinity(profile.id);
+    const { score, reasons } = this.matchingService.scoreForVolunteer(
+      initiative,
+      profile,
+      affinity,
+    );
+    return { matchScore: score, reasons };
+  }
+
   async getFeed(
     userId: string,
     query: FeedQueryDto = {},
@@ -359,27 +379,37 @@ export class InitiativesService {
   }
 
   private notifyMatchingVolunteers(initiative: InitiativeDto): void {
-    this.dataSource
+    const qb = this.dataSource
       .getRepository(VolunteerInterest)
       .createQueryBuilder('vi')
       .innerJoinAndSelect('vi.volunteerProfile', 'vp')
       .innerJoinAndSelect('vp.user', 'u')
       .innerJoin('vi.category', 'cat')
-      .where('cat.id = :categoryId', { categoryId: initiative.categoryId })
-      .andWhere('(:minAge IS NULL OR vp.age IS NULL OR vp.age >= :minAge)', {
-        minAge: initiative.minAge ?? null,
-      })
-      .getMany()
+      .where('cat.id = :categoryId', { categoryId: initiative.categoryId });
+
+    if (initiative.minAge != null) {
+      qb.andWhere('(vp.age IS NULL OR vp.age >= :minAge)', {
+        minAge: initiative.minAge,
+      });
+    }
+
+    qb.getMany()
       .then((interests) =>
         Promise.all(
           interests.map((vi) =>
-            this.mailService.sendNewInitiativeNotification(
-              vi.volunteerProfile.user.email,
-              initiative,
-            ),
+            this.mailService
+              .sendNewInitiativeNotification(
+                vi.volunteerProfile.user.email,
+                initiative,
+              )
+              .catch((err) =>
+                console.error('Error sending new initiative email:', err),
+              ),
           ),
         ),
       )
-      .catch(() => {});
+      .catch((err) =>
+        console.error('Error occurred while notifying volunteers:', err),
+      );
   }
 }

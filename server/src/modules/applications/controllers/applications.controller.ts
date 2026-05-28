@@ -45,4 +45,13 @@ export class ApplicationsController {
   findByVolunteer(@GetUser('id') userId: string): Promise<ApplicationDto[]> {
     return this.applicationsService.findByVolunteer(userId);
   }
+
+  @Get('volunteer/initiatives/:id/application')
+  @RolesAuth(UserRole.VOLUNTEER)
+  findOwnForInitiative(
+    @Param('id', ParseUUIDPipe) initiativeId: string,
+    @GetUser('id') userId: string,
+  ): Promise<ApplicationDto | null> {
+    return this.applicationsService.findOwnForInitiative(initiativeId, userId);
+  }
 }

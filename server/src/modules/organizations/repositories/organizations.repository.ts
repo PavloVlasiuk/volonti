@@ -25,10 +25,6 @@ export class OrganizationsRepository extends BaseRepositoryWrapper<
     return this.findOne({ where: { email } });
   }
 
-  async findRawByEdrpou(edrpou: string): Promise<Organization | null> {
-    return this.findOne({ where: { edrpou } });
-  }
-
   async findByStatus(status: OrgStatus): Promise<OrganizationDto[]> {
     const entities = await this.findToDto({
       where: { status },

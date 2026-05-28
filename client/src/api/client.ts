@@ -52,7 +52,11 @@ client.interceptors.response.use(
     }
 
     try {
-      const res = await axios.post<{ accessToken: string }>(`${BASE_URL}/auth/refresh`, { refreshToken })
+      const res = await axios.post<{ accessToken: string }>(
+        `${BASE_URL}/auth/refresh`,
+        null,
+        { headers: { Authorization: `Bearer ${refreshToken}` } },
+      )
       const newToken = res.data.accessToken
       localStorage.setItem('accessToken', newToken)
       processQueue(null, newToken)

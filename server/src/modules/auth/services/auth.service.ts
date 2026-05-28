@@ -1,6 +1,5 @@
 import {
   ConflictException,
-  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -50,7 +49,7 @@ export class AuthService {
       const savedUser = await manager.save(user);
 
       await manager.query(
-        `INSERT INTO volunteer_profiles ("firstName", "lastName", "userId") VALUES ($1, $2, $3)`,
+        `INSERT INTO volunteer_profiles (first_name, last_name, user_id) VALUES ($1, $2, $3)`,
         [dto.firstName, dto.lastName, savedUser.id],
       );
     });
@@ -109,22 +108,15 @@ export class AuthService {
     return this.signUserTokens(user.id, user.email, user.role);
   }
 
-  async loginOrganization(dto: { edrpou: string; password: string }): Promise<{
+  async loginOrganization(dto: { email: string; password: string }): Promise<{
     status: 'otp_required';
     pendingToken: string;
   }> {
-    const org = await this.organizationsService.findRawByEdrpou(dto.edrpou);
+    const org = await this.organizationsService.findRawByEmail(dto.email);
     if (!org) throw new UnauthorizedException('Invalid credentials');
 
     const passwordMatch = await bcrypt.compare(dto.password, org.passwordHash);
     if (!passwordMatch) throw new UnauthorizedException('Invalid credentials');
-
-    if (org.status === OrgStatus.PENDING) {
-      throw new ForbiddenException('Organization is pending verification');
-    }
-    if (org.status === OrgStatus.REJECTED) {
-      throw new ForbiddenException('Organization registration was rejected');
-    }
 
     const pendingToken = await this.otpService.generate(
       org.id,
