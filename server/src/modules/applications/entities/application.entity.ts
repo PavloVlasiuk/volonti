@@ -26,7 +26,12 @@ export class Application extends BaseEntity {
   })
   availability: AvailabilitySlot[];
 
-  @Column({ name: 'contact_phone', type: 'varchar', length: 32, nullable: true })
+  @Column({
+    name: 'contact_phone',
+    type: 'varchar',
+    length: 32,
+    nullable: true,
+  })
   contactPhone: string | null;
 
   @Column({ name: 'experience', type: 'text', nullable: true })
