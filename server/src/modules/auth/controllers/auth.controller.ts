@@ -28,8 +28,14 @@ export class AuthController {
 
   @Post('register/volunteer')
   @HttpCode(HttpStatus.CREATED)
-  registerVolunteer(@Body() dto: RegisterVolunteerDto): Promise<void> {
+  registerVolunteer(@Body() dto: RegisterVolunteerDto) {
     return this.authService.registerVolunteer(dto);
+  }
+
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  verifyEmail(@Body() dto: VerifyOtpDto) {
+    return this.authService.verifyEmail(dto);
   }
 
   @Post('register/organization')

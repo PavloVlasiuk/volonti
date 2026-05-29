@@ -9,6 +9,7 @@ export class OtpCodeDto {
   usedAt: Date | null;
   actorId: string;
   actor: ActorType;
+  createdAt: Date;
 
   constructor(entity: OtpCode) {
     this.id = entity.id;
@@ -18,5 +19,6 @@ export class OtpCodeDto {
     this.usedAt = entity.usedAt;
     this.actorId = entity.actorId;
     this.actor = entity.actor;
+    this.createdAt = entity.createdAt;
   }
 }

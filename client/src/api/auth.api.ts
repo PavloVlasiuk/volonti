@@ -10,6 +10,15 @@ export interface OtpRequiredResponse {
   pendingToken: string
 }
 
+export interface EmailVerificationRequiredResponse {
+  status: 'email_verification_required'
+  pendingToken: string
+}
+
+export interface PendingTokenResponse {
+  pendingToken: string
+}
+
 export interface TokensResponse {
   accessToken: string
   refreshToken: string
@@ -20,8 +29,9 @@ export async function registerVolunteer(data: {
   lastName: string
   email: string
   password: string
-}): Promise<void> {
-  await client.post('/auth/register/volunteer', data)
+}): Promise<PendingTokenResponse> {
+  const res = await client.post('/auth/register/volunteer', data)
+  return res.data
 }
 
 export async function registerOrganization(form: FormData): Promise<void> {
@@ -32,7 +42,7 @@ export async function registerOrganization(form: FormData): Promise<void> {
 
 export async function login(
   data: { email: string; password: string }
-): Promise<LoginResponse | OtpRequiredResponse> {
+): Promise<LoginResponse | OtpRequiredResponse | EmailVerificationRequiredResponse> {
   const res = await client.post('/auth/login', data)
   return res.data
 }
@@ -49,6 +59,14 @@ export async function verifyOtp(data: {
   code: string
 }): Promise<TokensResponse> {
   const res = await client.post('/auth/verify-otp', data)
+  return res.data
+}
+
+export async function verifyEmail(data: {
+  pendingToken: string
+  code: string
+}): Promise<TokensResponse> {
+  const res = await client.post('/auth/verify-email', data)
   return res.data
 }
 

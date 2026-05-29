@@ -16,4 +16,11 @@ export class OtpRepository extends BaseRepositoryWrapper<OtpCode, OtpCodeDto> {
   async findByPendingToken(pendingToken: string): Promise<OtpCodeDto | null> {
     return this.findOneToDto({ where: { pendingToken } });
   }
+
+  async findLatestByActor(actorId: string): Promise<OtpCodeDto | null> {
+    return this.findOneToDto({
+      where: { actorId },
+      order: { createdAt: 'DESC' },
+    });
+  }
 }

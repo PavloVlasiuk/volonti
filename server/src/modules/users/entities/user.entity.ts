@@ -15,4 +15,7 @@ export class User extends BaseEntity {
 
   @Column({ name: 'two_fa_enabled', default: false })
   twoFaEnabled: boolean;
+
+  @Column({ name: 'email_verified', default: false })
+  emailVerified: boolean;
 }

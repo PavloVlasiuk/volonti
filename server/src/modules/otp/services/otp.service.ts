@@ -9,6 +9,8 @@ import { ActorType } from '../../../common/enums';
 import { MailService } from '../../mail/services/mail.service';
 import { OtpRepository } from '../repositories/otp.repository';
 
+const RESEND_COOLDOWN_MS = 60 * 1000;
+
 @Injectable()
 export class OtpService {
   constructor(
@@ -21,6 +23,18 @@ export class OtpService {
     email: string,
     actor: ActorType,
   ): Promise<string> {
+    // Throttle resends: if a still-valid code was issued within the cooldown
+    // window, reuse it instead of sending another email.
+    const last = await this.otpRepository.findLatestByActor(actorId);
+    if (
+      last &&
+      !last.usedAt &&
+      last.expiresAt > new Date() &&
+      Date.now() - last.createdAt.getTime() < RESEND_COOLDOWN_MS
+    ) {
+      return last.pendingToken;
+    }
+
     const rawCode = Math.floor(100000 + Math.random() * 900000).toString();
     const code = await bcrypt.hash(rawCode, 10);
     const pendingToken = randomUUID();

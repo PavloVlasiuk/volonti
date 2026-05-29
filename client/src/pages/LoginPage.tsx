@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import Input from '../components/Input'
 import Button from '../components/Button'
-import { login, loginOrganization, verifyOtp } from '../api/auth.api'
+import { login, loginOrganization, verifyOtp, verifyEmail } from '../api/auth.api'
 import { useAuth } from '../context/AuthContext'
 
 const userLoginSchema = z.object({
@@ -37,6 +37,7 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const [mode, setMode] = useState<LoginMode>('user')
   const [pendingToken, setPendingToken] = useState<string | null>(null)
+  const [otpKind, setOtpKind] = useState<'login' | 'email'>('login')
   const [serverError, setServerError] = useState('')
 
   const userForm = useForm<UserLoginForm>({ resolver: zodResolver(userLoginSchema) })
@@ -55,6 +56,10 @@ export default function LoginPage() {
     try {
       const res = await login(data)
       if ('status' in res && res.status === 'otp_required') {
+        setOtpKind('login')
+        setPendingToken(res.pendingToken)
+      } else if ('status' in res && res.status === 'email_verification_required') {
+        setOtpKind('email')
         setPendingToken(res.pendingToken)
       } else if ('accessToken' in res) {
         authLogin(res)
@@ -70,6 +75,7 @@ export default function LoginPage() {
     setServerError('')
     try {
       const res = await loginOrganization(data)
+      setOtpKind('login')
       setPendingToken(res.pendingToken)
     } catch {
       setServerError('Невірний email або пароль')
@@ -80,7 +86,10 @@ export default function LoginPage() {
     if (!pendingToken) return
     setServerError('')
     try {
-      const res = await verifyOtp({ pendingToken, code: data.code })
+      const res =
+        otpKind === 'email'
+          ? await verifyEmail({ pendingToken, code: data.code })
+          : await verifyOtp({ pendingToken, code: data.code })
       authLogin(res)
       if (mode === 'organization') {
         navigate('/dashboard')
@@ -213,9 +222,13 @@ export default function LoginPage() {
             </>
           ) : (
             <>
-              <h2 className="mb-2 text-xl font-bold text-white">Підтвердження входу</h2>
+              <h2 className="mb-2 text-xl font-bold text-white">
+                {otpKind === 'email' ? 'Підтвердження email' : 'Підтвердження входу'}
+              </h2>
               <p className="mb-6 text-sm text-muted">
-                Ми надіслали 6-значний код на вашу пошту. Введіть його нижче.
+                {otpKind === 'email'
+                  ? 'Ваш email ще не підтверджено. Ми надіслали 6-значний код на вашу пошту — введіть його, щоб завершити реєстрацію.'
+                  : 'Ми надіслали 6-значний код на вашу пошту. Введіть його нижче.'}
               </p>
 
               <form onSubmit={otpForm.handleSubmit(handleOtp)} className="flex flex-col gap-4">
@@ -243,7 +256,7 @@ export default function LoginPage() {
               </form>
 
               <button
-                onClick={() => { setPendingToken(null); setServerError('') }}
+                onClick={() => { setPendingToken(null); setOtpKind('login'); setServerError('') }}
                 className="mt-4 text-sm text-muted hover:text-white transition-colors"
               >
                 ← Повернутись до входу

@@ -92,7 +92,7 @@ async function seed() {
     );
     if (!existingAdmin) {
       await qr.query(
-        `INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3)`,
+        `INSERT INTO users (email, password_hash, role, email_verified) VALUES ($1, $2, $3, true)`,
         ['admin@volonti.ua', passwordHash, UserRole.ADMIN],
       );
     }
@@ -403,7 +403,7 @@ async function seed() {
         ? existingVolUser.id
         : await insert(
             qr,
-            `INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id`,
+            `INSERT INTO users (email, password_hash, role, email_verified) VALUES ($1, $2, $3, true) RETURNING id`,
             [vol.email, passwordHash, UserRole.VOLUNTEER],
           );
 

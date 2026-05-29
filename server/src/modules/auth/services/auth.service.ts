@@ -35,24 +35,50 @@ export class AuthService {
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
-  async registerVolunteer(dto: RegisterVolunteerDto): Promise<void> {
+  async registerVolunteer(
+    dto: RegisterVolunteerDto,
+  ): Promise<{ pendingToken: string }> {
     const existing = await this.usersService.findByEmail(dto.email);
     if (existing) throw new ConflictException('Email already registered');
 
-    await this.dataSource.transaction(async (manager) => {
+    const savedUser = await this.dataSource.transaction(async (manager) => {
       const passwordHash = await bcrypt.hash(dto.password, 12);
       const user = manager.create(User, {
         email: dto.email,
         passwordHash,
         role: UserRole.VOLUNTEER,
       });
-      const savedUser = await manager.save(user);
+      const created = await manager.save(user);
 
       await manager.query(
         `INSERT INTO volunteer_profiles (first_name, last_name, user_id) VALUES ($1, $2, $3)`,
-        [dto.firstName, dto.lastName, savedUser.id],
+        [dto.firstName, dto.lastName, created.id],
       );
+      return created;
     });
+
+    const pendingToken = await this.otpService.generate(
+      savedUser.id,
+      savedUser.email,
+      ActorType.USER,
+    );
+    return { pendingToken };
+  }
+
+  async verifyEmail(
+    dto: VerifyOtpDto,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    const { actorId, actor } = await this.otpService.verify(
+      dto.pendingToken,
+      dto.code,
+    );
+    if (actor !== ActorType.USER)
+      throw new UnauthorizedException('Invalid verification token');
+
+    await this.usersService.setEmailVerified(actorId, true);
+
+    const user = await this.usersService.findById(actorId);
+    return this.signUserTokens(user.id, user.email, user.role);
   }
 
   async registerOrganization(
@@ -88,6 +114,7 @@ export class AuthService {
     dto: LoginDto,
   ): Promise<
     | { status: 'otp_required'; pendingToken: string }
+    | { status: 'email_verification_required'; pendingToken: string }
     | { accessToken: string; refreshToken: string }
   > {
     const user = await this.usersService.findRawByEmail(dto.email);
@@ -95,6 +122,15 @@ export class AuthService {
 
     const passwordMatch = await bcrypt.compare(dto.password, user.passwordHash);
     if (!passwordMatch) throw new UnauthorizedException('Invalid credentials');
+
+    if (user.role === UserRole.VOLUNTEER && !user.emailVerified) {
+      const pendingToken = await this.otpService.generate(
+        user.id,
+        user.email,
+        ActorType.USER,
+      );
+      return { status: 'email_verification_required', pendingToken };
+    }
 
     if (user.twoFaEnabled) {
       const pendingToken = await this.otpService.generate(

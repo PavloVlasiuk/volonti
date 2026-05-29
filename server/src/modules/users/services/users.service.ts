@@ -29,4 +29,8 @@ export class UsersService {
   async setTwoFa(userId: string, enabled: boolean): Promise<void> {
     await this.usersRepository.update(userId, { twoFaEnabled: enabled });
   }
+
+  async setEmailVerified(userId: string, verified: boolean): Promise<void> {
+    await this.usersRepository.update(userId, { emailVerified: verified });
+  }
 }
