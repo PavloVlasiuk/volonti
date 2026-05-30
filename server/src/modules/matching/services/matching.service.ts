@@ -89,14 +89,11 @@ export class MatchingService {
     now: Date,
   ): TermValues {
     const profileInterestIds = profile.interests?.map((i) => i.id) ?? [];
-    const profileInterestsCount = Math.max(profileInterestIds.length, 1);
     const matchingInterests = profileInterestIds.includes(initiative.categoryId)
       ? 1
       : 0;
     const affinity = appliedAffinity.get(initiative.categoryId) ?? 0;
-    const interest = clamp01(
-      matchingInterests / profileInterestsCount + 0.5 * affinity,
-    );
+    const interest = clamp01(matchingInterests + 0.5 * affinity);
 
     let location = 0;
     if (initiative.format === FormatType.REMOTE) {

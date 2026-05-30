@@ -4,9 +4,12 @@ import {
   CreateDateColumn,
   Entity,
   Index,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { ReviewParty } from '../../../common/enums';
+import { Initiative } from '../../initiatives/entities/initiative.entity';
 
 @Entity('reviews')
 @Index('UQ_reviews_initiative_author_target', [
@@ -23,6 +26,10 @@ export class Review {
 
   @Column({ name: 'initiative_id', type: 'uuid' })
   initiativeId: string;
+
+  @ManyToOne(() => Initiative, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'initiative_id' })
+  initiative: Initiative;
 
   @Column({
     name: 'author_type',

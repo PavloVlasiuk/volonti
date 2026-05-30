@@ -1,4 +1,4 @@
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -6,6 +6,7 @@ import InitiativeCard from '../components/InitiativeCard'
 import Pagination from '../components/Pagination'
 import Spinner from '../components/Spinner'
 import PersonalizationStrip from '../components/PersonalizationStrip'
+import ProfileSetupStrip from '../components/ProfileSetupStrip'
 import FeedFiltersDrawer from '../components/FeedFiltersDrawer'
 import { getFeed, getProfile } from '../api/profile.api'
 import { getCategories } from '../api/categories.api'
@@ -174,17 +175,16 @@ export default function FeedPage() {
   const feedItems = data?.items ?? []
   const total = data?.total ?? 0
 
+  // A freshly registered volunteer has no interests yet, so the matching
+  // algorithm has nothing to build on and the feed falls back to recency.
+  // Prompt them to complete the profile instead of pretending it's personalized.
+  const profileNeedsSetup = !!profile && (profile.interests?.length ?? 0) === 0
+
   const hasPersonalization =
     !!profile &&
     ((profile.interests?.length ?? 0) > 0 ||
       !!profile.city ||
       (profile.formatPreference && profile.formatPreference !== 'ANY'))
-
-  const hasNoInterests =
-    !hasActiveFilters &&
-    page === 1 &&
-    feedItems.length > 0 &&
-    feedItems.every((f) => f.matchScore === 0)
 
   const top = feedItems.filter((i) => i.matchScore >= TOP_THRESHOLD)
   const mid = feedItems.filter(
@@ -215,24 +215,16 @@ export default function FeedPage() {
               )}
             </div>
             <p className="mt-2 text-sm text-muted">
-              Підібрано за вашим профілем та інтересами
+              {profileNeedsSetup
+                ? 'Поки що сортуємо за новизною — заповніть профіль для персоналізації'
+                : 'Підібрано за вашим профілем та інтересами'}
             </p>
           </div>
 
-          {hasPersonalization && <PersonalizationStrip profile={profile} />}
-
-          {hasNoInterests && (
-            <div className="mb-6 rounded-xl bg-accent/10 border border-accent/20 px-5 py-4 flex items-center justify-between gap-4">
-              <p className="text-sm text-white/80">
-                Заповніть профіль, щоб бачити персоналізовані результати
-              </p>
-              <Link
-                to="/profile"
-                className="shrink-0 text-sm font-semibold text-accent hover:underline"
-              >
-                До профілю →
-              </Link>
-            </div>
+          {profileNeedsSetup ? (
+            <ProfileSetupStrip />
+          ) : (
+            hasPersonalization && <PersonalizationStrip profile={profile} />
           )}
 
           <FeedFiltersDrawer
@@ -269,6 +261,27 @@ export default function FeedPage() {
                 </button>
               )}
             </div>
+          ) : profileNeedsSetup ? (
+            // No interests yet → nothing to rank on. Show a plain recency grid
+            // without match scores or "Топ збігів"-style sections, so the page
+            // doesn't pretend the order is personalized.
+            <>
+              <SectionHeader
+                title="Нові ініціативи"
+                subtitle="Найсвіжіші можливості"
+              />
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {feedItems.map((item) => (
+                  <InitiativeCard key={item.id} initiative={item} dismissible />
+                ))}
+              </div>
+              <Pagination
+                page={page}
+                total={total}
+                limit={PAGE_SIZE}
+                onChange={setPage}
+              />
+            </>
           ) : useFallbackGrid ? (
             <>
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
