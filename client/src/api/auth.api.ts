@@ -34,10 +34,13 @@ export async function registerVolunteer(data: {
   return res.data
 }
 
-export async function registerOrganization(form: FormData): Promise<void> {
-  await client.post('/auth/register/organization', form, {
+export async function registerOrganization(
+  form: FormData
+): Promise<PendingTokenResponse> {
+  const res = await client.post('/auth/register/organization', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
+  return res.data
 }
 
 export async function login(

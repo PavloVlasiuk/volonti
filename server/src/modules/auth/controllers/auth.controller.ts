@@ -44,7 +44,7 @@ export class AuthController {
   registerOrganization(
     @Body() dto: RegisterOrganizationDto,
     @UploadedFile() file: Express.Multer.File | undefined,
-  ): Promise<void> {
+  ): Promise<{ pendingToken: string }> {
     return this.authService.registerOrganization(dto, file);
   }
 

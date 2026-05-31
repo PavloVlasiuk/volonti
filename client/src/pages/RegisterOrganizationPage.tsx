@@ -5,13 +5,14 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import Input from '../components/Input'
 import Button from '../components/Button'
-import { registerOrganization } from '../api/auth.api'
+import { registerOrganization, verifyOtp } from '../api/auth.api'
+import { useAuth } from '../context/AuthContext'
 
 const MAX_PDF_MB = 10
 
 const schema = z.object({
   name: z.string().min(1, 'Введіть назву організації'),
-  type: z.enum(['NGO', 'CHARITY', 'INITIATIVE_GROUP', 'GOVERNMENT'], {
+  type: z.enum(['NGO', 'CHARITY', 'MUNICIPAL', 'CRISIS_CENTER'], {
     message: 'Оберіть тип організації',
   }),
   edrpou: z
@@ -23,26 +24,35 @@ const schema = z.object({
   password: z.string().min(8, 'Мінімум 8 символів'),
 })
 
+const otpSchema = z.object({
+  code: z.string().length(6, 'Код має містити 6 цифр').regex(/^\d{6}$/, 'Тільки цифри'),
+})
+
 type FormData = z.infer<typeof schema>
+type OtpForm = z.infer<typeof otpSchema>
 
 const ORG_TYPES = [
   { value: 'NGO', label: 'НГО / Громадська організація' },
   { value: 'CHARITY', label: 'Благодійний фонд' },
-  { value: 'INITIATIVE_GROUP', label: 'Ініціативна група' },
-  { value: 'GOVERNMENT', label: 'Муніципальна / Державна' },
+  { value: 'MUNICIPAL', label: 'Муніципальна / Державна' },
+  { value: 'CRISIS_CENTER', label: 'Кризовий центр' },
 ] as const
 
 export default function RegisterOrganizationPage() {
   const navigate = useNavigate()
+  const { login: authLogin } = useAuth()
   const fileRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [fileError, setFileError] = useState('')
   const [serverError, setServerError] = useState('')
   const [isDragging, setIsDragging] = useState(false)
+  const [pendingToken, setPendingToken] = useState<string | null>(null)
+  const [email, setEmail] = useState('')
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
   })
+  const otpForm = useForm<OtpForm>({ resolver: zodResolver(otpSchema) })
 
   function handleFile(f: File) {
     setFileError('')
@@ -79,11 +89,24 @@ export default function RegisterOrganizationPage() {
       form.append('email', data.email)
       form.append('password', data.password)
       form.append('document', file)
-      await registerOrganization(form)
-      navigate('/login', { state: { pendingVerification: true } })
+      const res = await registerOrganization(form)
+      setEmail(data.email)
+      setPendingToken(res.pendingToken)
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } }
       setServerError(e?.response?.data?.message ?? 'Помилка реєстрації. Спробуйте ще раз.')
+    }
+  }
+
+  async function handleOtp(data: OtpForm) {
+    if (!pendingToken) return
+    setServerError('')
+    try {
+      const tokens = await verifyOtp({ pendingToken, code: data.code })
+      authLogin(tokens)
+      navigate('/dashboard')
+    } catch {
+      setServerError('Невірний або прострочений код')
     }
   }
 
@@ -98,6 +121,39 @@ export default function RegisterOrganizationPage() {
         </div>
 
         <div className="rounded-2xl bg-surface border border-white/[0.06] p-8">
+          {pendingToken ? (
+            <>
+              <h2 className="mb-2 text-xl font-bold text-white">Підтвердження email</h2>
+              <p className="mb-6 text-sm text-muted">
+                Ми надіслали 6-значний код на <span className="text-white">{email}</span>. Введіть його нижче, щоб завершити реєстрацію.
+              </p>
+
+              <form onSubmit={otpForm.handleSubmit(handleOtp)} className="flex flex-col gap-4">
+                <Input
+                  label="Код підтвердження"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="123456"
+                  maxLength={6}
+                  error={otpForm.formState.errors.code?.message}
+                  {...otpForm.register('code')}
+                />
+
+                {serverError && <p className="text-sm text-red-400">{serverError}</p>}
+
+                <Button
+                  type="submit"
+                  variant="filled"
+                  size="lg"
+                  loading={otpForm.formState.isSubmitting}
+                  className="w-full mt-2"
+                >
+                  Підтвердити
+                </Button>
+              </form>
+            </>
+          ) : (
+          <>
           <h2 className="mb-6 text-xl font-bold text-white">Реєстрація організації</h2>
 
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
@@ -225,6 +281,8 @@ export default function RegisterOrganizationPage() {
               Увійти
             </Link>
           </p>
+          </>
+          )}
         </div>
       </div>
     </div>

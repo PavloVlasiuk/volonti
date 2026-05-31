@@ -84,7 +84,7 @@ export class AuthService {
   async registerOrganization(
     dto: RegisterOrganizationDto,
     file: Express.Multer.File | undefined,
-  ): Promise<void> {
+  ): Promise<{ pendingToken: string }> {
     const existing = await this.organizationsService.findByEmail(dto.email);
     if (existing) throw new ConflictException('Email already registered');
 
@@ -93,7 +93,7 @@ export class AuthService {
       : null;
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
-    await this.organizationsService.create({
+    const org = await this.organizationsService.create({
       name: dto.name,
       type: dto.type,
       edrpou: dto.edrpou,
@@ -108,6 +108,13 @@ export class AuthService {
       dto.name,
       OrgStatus.PENDING,
     );
+
+    const pendingToken = await this.otpService.generate(
+      org.id,
+      org.email,
+      ActorType.ORGANIZATION,
+    );
+    return { pendingToken };
   }
 
   async login(
